@@ -1,0 +1,17 @@
+# 本機 secrets（含密碼）勿提交
+.streamlit/secrets.toml
+
+# 本機資料庫（雲端請用 Turso；勿把含真實資料的 db 推上公開 repo）
+*.db
+*.sqlite
+*.sqlite3
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+
+# macOS
+.DS_Store
