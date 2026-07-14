@@ -33,73 +33,82 @@ def _collect_all_summaries(conn, supported_etfs):
     return summaries
 
 
-def _nav_to_filtered(code: str, name: str, chg: str) -> None:
-    """on_click：在 widget 建立前寫入導覽狀態。"""
+def _escape_html(text: str) -> str:
+    return (
+        str(text)
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+    )
+
+
+def _nav_to_etf(code: str, name: str) -> None:
+    """整卡點擊：進入該檔全部異動明細。"""
     st.session_state["view_etf_select"] = f"{code} {name}"
     st.session_state["main_nav"] = "單檔分析"
-    st.session_state["period_chg_filter"] = chg
+    st.session_state["period_chg_filter"] = "全部"
 
 
 def _render_status_cards(summaries):
-    """原生卡片；加碼／減碼用可點按鈕（on_click，Cloud 上比 HTML 連結穩）。"""
+    """整張卡片可點，進入該檔變動明細（不分加碼／減碼）。"""
     cols = st.columns(4, gap="medium")
     for col, (code, info) in zip(cols, summaries.items()):
         summary = info["summary"]
         with col:
-            with st.container(border=True):
-                st.markdown(
-                    f"[**{code}**](?etf={code})  \n"
-                    f"<span style='color:#6b7a88;font-size:0.82rem'>{info['name']}</span>",
-                    unsafe_allow_html=True,
+            if summary is None:
+                with st.container(border=True):
+                    st.markdown(f"**{code}**")
+                    st.caption(info["name"])
+                    st.error("尚無資料")
+                continue
+
+            if summary["prev_date"]:
+                add_n = summary["add_count"]
+                cut_n = summary["reduce_count"]
+                top_buy = (
+                    f"最大加碼 {_escape_html(summary['top_buy']['name'])} "
+                    f"+{summary['top_buy']['lots']:.0f} 張"
+                    if summary["top_buy"]
+                    else "最大加碼 —"
+                )
+                top_sell = (
+                    f"最大減碼 {_escape_html(summary['top_sell']['name'])} "
+                    f"{summary['top_sell']['lots']:.0f} 張"
+                    if summary["top_sell"]
+                    else "最大減碼 —"
+                )
+                body = (
+                    f'<div class="etf-card-date">最新 {_escape_html(summary["latest_date"])}</div>'
+                    f'<div class="etf-card-stat">{summary["change_count"]}<span>檔異動</span></div>'
+                    f'<div class="etf-card-pills">'
+                    f'<span class="etf-pill buy">▲ 加碼 {add_n}</span>'
+                    f'<span class="etf-pill sell">▼ 減碼 {cut_n}</span>'
+                    f"</div>"
+                    f'<div class="etf-card-note">{top_buy}</div>'
+                    f'<div class="etf-card-note">{top_sell}</div>'
+                )
+            else:
+                body = (
+                    f'<div class="etf-card-date">最新 {_escape_html(summary["latest_date"])}</div>'
+                    f'<div class="etf-card-stat">{summary["holding_count"]}<span>檔持股</span></div>'
+                    f'<div class="etf-card-note">僅單日資料，尚無異動可比對</div>'
                 )
 
-                if summary is None:
-                    st.error("尚無資料")
-                    continue
-
-                st.caption(f"最新 {summary['latest_date']}")
-
-                if summary["prev_date"]:
-                    st.metric("今日異動", f"{summary['change_count']} 檔")
-                    add_n = summary["add_count"]
-                    cut_n = summary["reduce_count"]
-                    a, b = st.columns(2)
-                    with a:
-                        st.button(
-                            f"▲ 加碼  {add_n}",
-                            key=f"card_add_{code}",
-                            use_container_width=True,
-                            disabled=add_n <= 0,
-                            on_click=_nav_to_filtered,
-                            args=(code, info["name"], "加碼"),
-                        )
-                    with b:
-                        st.button(
-                            f"▼ 減碼  {cut_n}",
-                            key=f"card_cut_{code}",
-                            use_container_width=True,
-                            disabled=cut_n <= 0,
-                            on_click=_nav_to_filtered,
-                            args=(code, info["name"], "減碼"),
-                        )
-                    st.caption(
-                        f"最大加碼 {summary['top_buy']['name']} "
-                        f"+{summary['top_buy']['lots']:.0f} 張"
-                        if summary["top_buy"]
-                        else "最大加碼 —"
-                    )
-                    st.caption(
-                        f"最大減碼 {summary['top_sell']['name']} "
-                        f"{summary['top_sell']['lots']:.0f} 張"
-                        if summary["top_sell"]
-                        else "最大減碼 —"
-                    )
-                else:
-                    st.metric("持股檔數", summary["holding_count"])
-                    st.caption("僅單日資料，尚無異動可比對")
-                    st.caption(" ")
-
-                st.caption("點代號看全部 · 點加碼／減碼看對應清單")
+            # st.html 不走 Markdown，整卡 <a> 可點且不會變成程式碼區塊
+            card_html = (
+                f'<a class="etf-card-link" href="?etf={code}" target="_self">'
+                f'<div class="etf-card">'
+                f'<div class="etf-card-code">{code}</div>'
+                f'<div class="etf-card-name">{_escape_html(info["name"])}</div>'
+                f"{body}"
+                f'<div class="etf-card-hint">點擊查看異動明細</div>'
+                f"</div></a>"
+            )
+            if hasattr(st, "html"):
+                st.html(card_html)
+            else:
+                st.markdown(card_html, unsafe_allow_html=True)
 
 
 def _render_cross_etf_table(summaries):
@@ -315,7 +324,7 @@ def _render_industry_donut(conn, summaries, supported_etfs):
 def render_dashboard(conn, supported_etfs):
     render_section(
         "四檔操盤總覽",
-        "點代號看全部分析；點 ▲加碼／▼減碼 只看該側異動。",
+        "點擊任一張卡片，查看該檔全部異動明細。",
     )
 
     if not _has_any_data(conn, supported_etfs):

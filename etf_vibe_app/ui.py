@@ -41,7 +41,7 @@ CHART_PALETTE = [
 
 def inject_styles() -> None:
     # 允許 CSS 更新後重新注入（避免 session 快取舊樣式）
-    style_ver = "etf-card-v5"
+    style_ver = "etf-card-v6"
     if st.session_state.get("_vibe_styles_ver") == style_ver:
         return
     st.session_state["_vibe_styles_ver"] = style_ver
@@ -119,46 +119,92 @@ div[data-testid="stCode"] code {{
   font-weight: 700;
 }}
 
-/* 總覽卡內的代號連結看起來像標題 */
-div[data-testid="stVerticalBlockBorderWrapper"] a {{
-  color: {COLORS["ink"]} !important;
+/* 總覽整卡可點 */
+a.etf-card-link {{
   text-decoration: none !important;
-  font-family: "Fraunces", Georgia, serif;
-  font-size: 1.15rem;
+  color: inherit !important;
+  display: block;
+  height: 100%;
 }}
-div[data-testid="stVerticalBlockBorderWrapper"] a:hover {{
-  color: {COLORS["jade_deep"]} !important;
-  text-decoration: underline !important;
+.etf-card {{
+  background: rgba(255,255,255,0.94);
+  border: 1px solid {COLORS["line"]};
+  border-radius: 16px;
+  padding: 1rem 1rem 0.85rem;
+  min-height: 230px;
+  box-shadow: 0 8px 20px rgba(36, 52, 71, 0.04);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+  cursor: pointer;
+}}
+a.etf-card-link:hover .etf-card {{
+  border-color: {COLORS["jade"]};
+  box-shadow: 0 12px 28px rgba(61, 143, 114, 0.14);
+  transform: translateY(-2px);
+}}
+.etf-card-code {{
+  font-family: "Fraunces", Georgia, serif;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: {COLORS["ink"]};
+}}
+.etf-card-name {{
+  color: {COLORS["muted"]};
+  font-size: 0.82rem;
+  margin: 0.15rem 0 0.75rem;
+}}
+.etf-card-date {{
+  font-size: 0.78rem;
+  color: {COLORS["muted"]};
+}}
+.etf-card-stat {{
+  font-family: "Fraunces", Georgia, serif;
+  font-size: 1.55rem;
+  font-weight: 700;
+  color: {COLORS["ink"]};
+  line-height: 1.15;
+  margin: 0.15rem 0 0.55rem;
+}}
+.etf-card-stat span {{
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: {COLORS["muted"]};
+  margin-left: 0.2rem;
+}}
+.etf-card-pills {{
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.45rem;
+}}
+.etf-pill {{
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+}}
+.etf-pill.buy {{
+  background: {COLORS["mint"]};
+  color: {COLORS["jade_deep"]};
+}}
+.etf-pill.sell {{
+  background: #f8ebe3;
+  color: {COLORS["sell"]};
+}}
+.etf-card-note {{
+  font-size: 0.78rem;
+  color: {COLORS["ink_soft"]};
+  line-height: 1.35;
+  margin-top: 0.15rem;
+}}
+.etf-card-hint {{
+  margin-top: 0.8rem;
+  font-size: 0.75rem;
+  color: {COLORS["jade"]};
+  font-weight: 600;
 }}
 
-.chg-pair {{
-  display: flex;
-  gap: 0.45rem;
-  margin: 0.35rem 0 0.55rem;
-}}
-/* 總覽卡內加碼／減碼按鈕上色 */
-div[data-testid="stVerticalBlockBorderWrapper"] div[data-testid="stHorizontalBlock"] > div:nth-child(1) button {{
-  background: {COLORS["mint"]} !important;
-  color: {COLORS["jade_deep"]} !important;
-  border: 1px solid #cfe8dc !important;
-  font-weight: 700 !important;
-}}
-div[data-testid="stVerticalBlockBorderWrapper"] div[data-testid="stHorizontalBlock"] > div:nth-child(2) button {{
-  background: #f8ebe3 !important;
-  color: {COLORS["sell"]} !important;
-  border: 1px solid #efd5c4 !important;
-  font-weight: 700 !important;
-}}
-a.chg-add {{
-  background: {COLORS["mint"]} !important;
-  color: {COLORS["jade_deep"]} !important;
-  border-color: #cfe8dc !important;
-}}
-a.chg-cut {{
-  background: #f8ebe3 !important;
-  color: {COLORS["sell"]} !important;
-  border-color: #efd5c4 !important;
-}}
+/* 舊加碼／減碼按鈕樣式不再使用 */
+.chg-pair {{ display: none; }}
 
 div[data-testid="stTabs"] button[data-baseweb="tab"] {{
   font-weight: 600;
