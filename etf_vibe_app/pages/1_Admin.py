@@ -25,7 +25,7 @@ from parser import (
     parse_holdings_file,
     parse_standard_filename,
     parse_to_save_rows,
-    suggested_filename,
+    suggested_filename_stem,
     validate_holdings,
 )
 
@@ -67,17 +67,20 @@ with tab_upload:
         key="naming_date",
     )
     st.markdown("#### 統一檔名（下載後先改名再上傳）")
-    st.caption("格式：`ETF代號_YYYYMMDD.xlsx` → 系統會自動存到對應 ETF × 交易日。")
+    st.caption(
+        "格式：`ETF代號_YYYYMMDD`（不含副檔名，保留原檔的 .xlsx / .csv 即可）"
+        " → 系統會自動存到對應 ETF × 交易日。"
+    )
 
     name_cols = st.columns(4)
     for col, code in zip(name_cols, etf_codes):
-        fname = suggested_filename(code, naming_date)
+        stem = suggested_filename_stem(code, naming_date)
         with col:
-            st.code(fname, language=None)
+            st.code(stem, language=None)
             st.caption(SUPPORTED_ETFS[code])
 
     st.info(
-        "盤後流程：官網下載 → 依上表改名 → 一次拖入四檔 → 確認寫入。"
+        "盤後流程：官網下載 → 只改檔名、副檔名不動 → 一次拖入四檔 → 確認寫入。"
         "符合統一檔名時不需再手動選 ETF／日期。"
     )
 

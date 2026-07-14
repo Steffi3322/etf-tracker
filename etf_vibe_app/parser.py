@@ -55,13 +55,17 @@ class ParseResult:
     warnings: list[str] = field(default_factory=list)
 
 
-def suggested_filename(etf_code: str, trade_date: date | str, ext: str = "xlsx") -> str:
-    """回傳統一檔名，例如 00400A_20260709.xlsx。"""
+def suggested_filename_stem(etf_code: str, trade_date: date | str) -> str:
+    """回傳統一檔名（不含副檔名），例如 00400A_20260709。"""
     if isinstance(trade_date, str):
         trade_date = datetime.strptime(trade_date, "%Y-%m-%d").date()
-    ymd = trade_date.strftime("%Y%m%d")
+    return f"{etf_code}_{trade_date.strftime('%Y%m%d')}"
+
+
+def suggested_filename(etf_code: str, trade_date: date | str, ext: str = "xlsx") -> str:
+    """回傳統一檔名（含副檔名），例如 00400A_20260709.xlsx。"""
     ext = ext.lstrip(".") or "xlsx"
-    return f"{etf_code}_{ymd}.{ext}"
+    return f"{suggested_filename_stem(etf_code, trade_date)}.{ext}"
 
 
 def parse_standard_filename(filename: str) -> tuple[str | None, str | None]:
