@@ -4,7 +4,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from analysis import summarize_etf_changes
-from db import get_holdings, get_holdings_for_dates, get_saved_dates
+from db import get_holdings, get_saved_dates
 from industry import attach_industry
 from ui import CHART_PALETTE, COLORS, plotly_layout, render_etf_status_card, render_section
 
