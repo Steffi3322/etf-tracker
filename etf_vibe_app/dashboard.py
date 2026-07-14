@@ -28,8 +28,15 @@ def _collect_all_summaries(conn, supported_etfs):
     return summaries
 
 
+def _open_etf_detail(code: str, name: str) -> None:
+    """從總覽卡片跳到單檔分析。"""
+    st.session_state["view_etf_select"] = f"{code} {name}"
+    st.session_state["main_nav"] = "單檔分析"
+    st.rerun()
+
+
 def _render_status_cards(summaries):
-    """四欄等結構卡片，避免自訂 HTML 在 Cloud 上塌掉。"""
+    """四欄等結構卡片；可點擊進入該檔分析。"""
     cols = st.columns(4, gap="medium")
     for col, (code, info) in zip(cols, summaries.items()):
         summary = info["summary"]
@@ -40,8 +47,12 @@ def _render_status_cards(summaries):
 
                 if summary is None:
                     st.error("尚無資料")
-                    st.caption(" ")
-                    st.caption(" ")
+                    st.button(
+                        "查看分析",
+                        key=f"open_{code}",
+                        disabled=True,
+                        use_container_width=True,
+                    )
                     continue
 
                 st.caption(f"最新 {summary['latest_date']}")
@@ -70,6 +81,14 @@ def _render_status_cards(summaries):
                     st.caption("僅單日資料，尚無異動可比對")
                     st.caption(" ")
                     st.caption(" ")
+
+                if st.button(
+                    "查看分析 →",
+                    key=f"open_{code}",
+                    use_container_width=True,
+                    type="secondary",
+                ):
+                    _open_etf_detail(code, info["name"])
 
 
 def _render_cross_etf_table(summaries):
@@ -272,7 +291,7 @@ def _render_industry_donut(conn, summaries, supported_etfs):
 
 
 def render_dashboard(conn, supported_etfs):
-    render_section("四檔操盤總覽", "最新異動、跨檔加碼與持股結構。")
+    render_section("四檔操盤總覽", "點卡片下方「查看分析」可進入該檔詳情。")
 
     if not _has_any_data(conn, supported_etfs):
         st.info("尚無任何 ETF 資料。請由管理員上傳持股明細。")

@@ -20,6 +20,12 @@ def render_detail_analysis(conn):
     render_section("單檔深度分析", "自訂區間、移動矩陣與原始持股明細。")
 
     etf_options = [f"{code} {name}" for code, name in SUPPORTED_ETFS.items()]
+    # 從總覽點進來時，session_state 已帶好 view_etf_select
+    if "view_etf_select" not in st.session_state:
+        st.session_state["view_etf_select"] = etf_options[0]
+    elif st.session_state["view_etf_select"] not in etf_options:
+        st.session_state["view_etf_select"] = etf_options[0]
+
     selected_view_etf_str = st.selectbox(
         "選擇主動式 ETF", etf_options, key="view_etf_select"
     )

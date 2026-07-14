@@ -34,13 +34,19 @@ with st.sidebar:
     st.markdown("---")
     st.caption("上傳與維護請至 Admin（需密碼）")
 
+if "main_nav" not in st.session_state:
+    st.session_state.main_nav = "四檔總覽"
+
+nav = st.segmented_control(
+    "主畫面",
+    options=["四檔總覽", "單檔分析"],
+    key="main_nav",
+    label_visibility="collapsed",
+)
+
 conn = get_connection()
-tab_dashboard, tab_detail = st.tabs(["四檔總覽", "單檔分析"])
-
-with tab_dashboard:
-    render_dashboard(conn, SUPPORTED_ETFS)
-
-with tab_detail:
+if nav == "單檔分析":
     render_detail_analysis(conn)
-
+else:
+    render_dashboard(conn, SUPPORTED_ETFS)
 conn.close()
