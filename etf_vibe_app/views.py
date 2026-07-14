@@ -10,7 +10,10 @@ from analysis import (
     align_inventory_date,
     align_start_date,
     compute_period_diff,
+    is_add_action,
+    is_cut_action,
     label_action,
+    style_action_column,
 )
 from db import SUPPORTED_ETFS, get_holdings, get_holdings_for_dates, get_saved_dates
 from ui import render_section
@@ -129,24 +132,26 @@ def render_detail_analysis(conn):
 
                 show = df_period_show
                 if chosen == "加碼":
-                    show = df_period_show[df_period_show["動向"].isin(["加碼", "新進"])]
+                    show = df_period_show[df_period_show["動向"].map(is_add_action)]
                 elif chosen == "減碼":
-                    show = df_period_show[df_period_show["動向"].isin(["減碼", "清倉"])]
-                elif chosen in ("新進", "清倉"):
-                    show = df_period_show[df_period_show["動向"] == chosen]
+                    show = df_period_show[df_period_show["動向"].map(is_cut_action)]
+                elif chosen == "新進":
+                    show = df_period_show[df_period_show["動向"].isin(["＋ 新進", "新進"])]
+                elif chosen == "清倉":
+                    show = df_period_show[df_period_show["動向"].isin(["× 清倉", "清倉"])]
 
                 show = show.copy()
                 show.index = range(1, len(show) + 1)
                 if chosen and chosen != "全部":
                     st.info(f"目前顯示：{chosen}（共 {len(show)} 檔）")
-                st.caption("動向＝一眼定性；右側數字為實際張數與權重變化（pt＝百分點）。")
+                st.caption("動向欄有顏色標示：綠色系＝加碼／新進，橘色系＝減碼／清倉。")
                 st.dataframe(
-                    show,
+                    style_action_column(show, "動向"),
                     use_container_width=True,
                     column_config={
                         "動向": st.column_config.TextColumn(
                             "動向",
-                            help="新進／清倉／加碼／減碼（依持股變化事實判斷）",
+                            help="＋新進／×清倉／▲加碼／▼減碼",
                             width="small",
                         ),
                         "區間淨增減(張)": st.column_config.NumberColumn(

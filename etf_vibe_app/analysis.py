@@ -41,14 +41,37 @@ def label_action(row, diff_col="區間淨增減(張)", start_col="s_start", end_
     diff = float(row[diff_col] or 0)
 
     if start == 0 and end > 0:
-        return "新進"
+        return "＋ 新進"
     if start > 0 and end == 0:
-        return "清倉"
+        return "× 清倉"
     if diff > 0:
-        return "加碼"
+        return "▲ 加碼"
     if diff < 0:
-        return "減碼"
-    return "持平"
+        return "▼ 減碼"
+    return "－ 持平"
+
+
+def is_add_action(label: str) -> bool:
+    return label in {"▲ 加碼", "＋ 新進", "加碼", "新進"}
+
+
+def is_cut_action(label: str) -> bool:
+    return label in {"▼ 減碼", "× 清倉", "減碼", "清倉"}
+
+
+def style_action_column(df: pd.DataFrame, col: str = "動向"):
+    """為動向欄加上綠／橘底色，方便掃讀。"""
+
+    def _color(val: str) -> str:
+        if is_add_action(str(val)):
+            return "background-color: #e7f5ee; color: #1f6b4f; font-weight: 700"
+        if is_cut_action(str(val)):
+            return "background-color: #fbebe3; color: #a85a2a; font-weight: 700"
+        return ""
+
+    if col not in df.columns or df.empty:
+        return df
+    return df.style.map(_color, subset=[col])
 
 
 def compute_period_diff(df_start, df_end):

@@ -3,7 +3,12 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 
-from analysis import summarize_etf_changes
+from analysis import (
+    is_add_action,
+    is_cut_action,
+    summarize_etf_changes,
+    style_action_column,
+)
 from db import get_holdings, get_saved_dates
 from industry import attach_industry
 from ui import CHART_PALETTE, COLORS, plotly_layout, render_section
@@ -28,8 +33,15 @@ def _collect_all_summaries(conn, supported_etfs):
     return summaries
 
 
+def _nav_to_filtered(code: str, name: str, chg: str) -> None:
+    """on_click：在 widget 建立前寫入導覽狀態。"""
+    st.session_state["view_etf_select"] = f"{code} {name}"
+    st.session_state["main_nav"] = "單檔分析"
+    st.session_state["period_chg_filter"] = chg
+
+
 def _render_status_cards(summaries):
-    """原生卡片；點代號進分析，點加碼／減碼數字只看該側異動。"""
+    """原生卡片；加碼／減碼用可點按鈕（on_click，Cloud 上比 HTML 連結穩）。"""
     cols = st.columns(4, gap="medium")
     for col, (code, info) in zip(cols, summaries.items()):
         summary = info["summary"]
@@ -51,20 +63,25 @@ def _render_status_cards(summaries):
                     st.metric("今日異動", f"{summary['change_count']} 檔")
                     add_n = summary["add_count"]
                     cut_n = summary["reduce_count"]
-                    # 單行 HTML，避免 Markdown 縮排變程式碼區塊
-                    st.markdown(
-                        (
-                            f'<div class="chg-pair">'
-                            f'<a class="chg-add" href="?etf={code}&chg=add">'
-                            f'<span class="chg-icon">▲</span>加碼'
-                            f'<strong>{add_n}</strong></a>'
-                            f'<a class="chg-cut" href="?etf={code}&chg=cut">'
-                            f'<span class="chg-icon">▼</span>減碼'
-                            f'<strong>{cut_n}</strong></a>'
-                            f"</div>"
-                        ),
-                        unsafe_allow_html=True,
-                    )
+                    a, b = st.columns(2)
+                    with a:
+                        st.button(
+                            f"▲ 加碼  {add_n}",
+                            key=f"card_add_{code}",
+                            use_container_width=True,
+                            disabled=add_n <= 0,
+                            on_click=_nav_to_filtered,
+                            args=(code, info["name"], "加碼"),
+                        )
+                    with b:
+                        st.button(
+                            f"▼ 減碼  {cut_n}",
+                            key=f"card_cut_{code}",
+                            use_container_width=True,
+                            disabled=cut_n <= 0,
+                            on_click=_nav_to_filtered,
+                            args=(code, info["name"], "減碼"),
+                        )
                     st.caption(
                         f"最大加碼 {summary['top_buy']['name']} "
                         f"+{summary['top_buy']['lots']:.0f} 張"
@@ -110,7 +127,7 @@ def _render_cross_etf_table(summaries):
 
     df = pd.DataFrame(rows).sort_values("淨增減(張)", ascending=False)
     st.dataframe(
-        df,
+        style_action_column(df, "動向"),
         use_container_width=True,
         hide_index=True,
         column_config={
@@ -121,7 +138,7 @@ def _render_cross_etf_table(summaries):
     )
 
     overlap = (
-        df[df["淨增減(張)"] > 0]
+        df[df["動向"].map(is_add_action)]
         .groupby(["股票代號", "股票名稱"])
         .agg(加碼ETF數=("ETF", "nunique"), ETF清單=("ETF", lambda x: "、".join(sorted(x))))
         .reset_index()
