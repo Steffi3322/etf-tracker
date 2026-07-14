@@ -85,6 +85,7 @@ def _render_cross_etf_table(summaries):
                     "ETF": code,
                     "股票代號": row["stock_code"],
                     "股票名稱": row["股票名稱"],
+                    "動向": row["操作"],
                     "淨增減(張)": row["區間淨增減(張)"],
                     "權重變動(pt)": round(row["w_end"] - row["w_start"], 2),
                     "期初權重(%)": round(row["w_start"], 2),
@@ -96,7 +97,16 @@ def _render_cross_etf_table(summaries):
         return
 
     df = pd.DataFrame(rows).sort_values("淨增減(張)", ascending=False)
-    st.dataframe(df, use_container_width=True, hide_index=True)
+    st.dataframe(
+        df,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "動向": st.column_config.TextColumn("動向", width="small"),
+            "淨增減(張)": st.column_config.NumberColumn("淨增減(張)", format="%+.1f"),
+            "權重變動(pt)": st.column_config.NumberColumn("權重變動(pt)", format="%+.2f"),
+        },
+    )
 
     overlap = (
         df[df["淨增減(張)"] > 0]

@@ -10,6 +10,7 @@ from analysis import (
     align_inventory_date,
     align_start_date,
     compute_period_diff,
+    label_action,
 )
 from db import SUPPORTED_ETFS, get_holdings, get_holdings_for_dates, get_saved_dates
 from ui import render_section
@@ -98,11 +99,13 @@ def render_detail_analysis(conn):
                 df_period["期末持股(張)"] = (df_period["s_end"] / 1000).round(1)
                 df_period["區間權重變動(%)"] = (df_period["w_end"] - df_period["w_start"]).round(2)
                 df_period = df_period.sort_values(by="區間淨增減(張)", ascending=False)
+                df_period["動向"] = df_period.apply(label_action, axis=1)
 
                 df_period_show = pd.DataFrame(
                     {
                         "股票代號": df_period["stock_code"],
                         "股票名稱": df_period["股票名稱"],
+                        "動向": df_period["動向"],
                         "區間淨增減(張)": df_period["區間淨增減(張)"],
                         "區間權重變動(pt)": df_period["區間權重變動(%)"],
                         f"{actual_start_str}張數": df_period["期初持股(張)"],
@@ -112,8 +115,26 @@ def render_detail_analysis(conn):
                     }
                 )
                 df_period_show.index = range(1, len(df_period_show) + 1)
-                st.caption("正數＝加碼、負數＝減碼；權重變動以百分點（pt）表示。")
-                st.dataframe(df_period_show, use_container_width=True)
+                st.caption("動向＝一眼定性；右側數字為實際張數與權重變化（pt＝百分點）。")
+                st.dataframe(
+                    df_period_show,
+                    use_container_width=True,
+                    column_config={
+                        "動向": st.column_config.TextColumn(
+                            "動向",
+                            help="新進／清倉／加碼／減碼（依持股變化事實判斷）",
+                            width="small",
+                        ),
+                        "區間淨增減(張)": st.column_config.NumberColumn(
+                            "區間淨增減(張)",
+                            format="%+.1f",
+                        ),
+                        "區間權重變動(pt)": st.column_config.NumberColumn(
+                            "區間權重變動(pt)",
+                            format="%+.2f",
+                        ),
+                    },
+                )
 
                 csv_period = df_period_show.to_csv(index=False).encode("utf-8-sig")
                 st.download_button(

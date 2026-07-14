@@ -35,13 +35,20 @@ def align_inventory_date(selected, valid_dates):
 
 
 def label_action(row, diff_col="區間淨增減(張)", start_col="s_start", end_col="s_end", period=False):
-    if row[start_col] == 0 and row[end_col] > 0:
-        return "🆕 區間新進榜" if period else "🆕 新進榜"
-    if row[start_col] > 0 and row[end_col] == 0:
-        return "❌ 區間已清倉" if period else "❌ 已清倉"
-    if row[diff_col] > 0:
-        return "🟢 波段持續加碼" if period else "🟢 加碼"
-    return "🟠 波段逢高減碼" if period else "🟠 減碼"
+    """一眼定性：只描述發生什麼，不臆測經理人策略。"""
+    start = float(row[start_col] or 0)
+    end = float(row[end_col] or 0)
+    diff = float(row[diff_col] or 0)
+
+    if start == 0 and end > 0:
+        return "新進"
+    if start > 0 and end == 0:
+        return "清倉"
+    if diff > 0:
+        return "加碼"
+    if diff < 0:
+        return "減碼"
+    return "持平"
 
 
 def compute_period_diff(df_start, df_end):
