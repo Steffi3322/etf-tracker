@@ -85,9 +85,10 @@ def _render_cross_etf_table(summaries):
                     "ETF": code,
                     "股票代號": row["stock_code"],
                     "股票名稱": row["股票名稱"],
-                    "操作": row["操作"],
                     "淨增減(張)": row["區間淨增減(張)"],
-                    "權重變動(%)": round(row["w_end"] - row["w_start"], 2),
+                    "權重變動(pt)": round(row["w_end"] - row["w_start"], 2),
+                    "期初權重(%)": round(row["w_start"], 2),
+                    "期末權重(%)": round(row["w_end"], 2),
                 }
             )
     if not rows:
