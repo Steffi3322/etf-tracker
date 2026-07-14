@@ -13,7 +13,14 @@ from db import SUPPORTED_ETFS
 
 WEIGHT_SUM_TOLERANCE = 5.0  # 主動 ETF 常有現金部位，股票權重加總常低於 100%
 
-# 檔名關鍵字 → ETF 代號（較長關鍵字優先）
+# 統一檔名：{ETF代號}_{YYYYMMDD}.xlsx  → 自動歸檔到正確 ETF × 交易日
+# 例：00400A_20260709.xlsx
+_STANDARD_NAME_RE = re.compile(
+    r"(?P<code>00400A|00403A|00981A|00992A)[_-](?P<ymd>20\d{6})",
+    re.IGNORECASE,
+)
+
+# 檔名關鍵字 → ETF 代號（較長關鍵字優先；標準格式優先於關鍵字）
 _ETF_FILENAME_HINTS: list[tuple[str, str]] = [
     ("00400A", "00400A"),
     ("00403A", "00403A"),
@@ -48,8 +55,35 @@ class ParseResult:
     warnings: list[str] = field(default_factory=list)
 
 
+def suggested_filename(etf_code: str, trade_date: date | str, ext: str = "xlsx") -> str:
+    """回傳統一檔名，例如 00400A_20260709.xlsx。"""
+    if isinstance(trade_date, str):
+        trade_date = datetime.strptime(trade_date, "%Y-%m-%d").date()
+    ymd = trade_date.strftime("%Y%m%d")
+    ext = ext.lstrip(".") or "xlsx"
+    return f"{etf_code}_{ymd}.{ext}"
+
+
+def parse_standard_filename(filename: str) -> tuple[str | None, str | None]:
+    """若符合統一檔名，回傳 (etf_code, YYYY-MM-DD)。"""
+    stem = filename.rsplit("/", 1)[-1]
+    match = _STANDARD_NAME_RE.search(stem)
+    if not match:
+        return None, None
+    code = match.group("code").upper()
+    ymd = match.group("ymd")
+    try:
+        return code, date(int(ymd[:4]), int(ymd[4:6]), int(ymd[6:8])).isoformat()
+    except ValueError:
+        return code, None
+
+
 def infer_date_from_filename(filename: str) -> str | None:
-    """從檔名推斷 YYYY-MM-DD。支援 20260709 / 2026-07-09 / 2026_07_09 / 2026.07.09。"""
+    """從檔名推斷 YYYY-MM-DD。優先統一格式，其次 2026-07-09 / 20260709 等。"""
+    _, standard_date = parse_standard_filename(filename)
+    if standard_date:
+        return standard_date
+
     stem = filename.rsplit("/", 1)[-1]
     patterns = [
         r"(20\d{2})[-_./](\d{1,2})[-_./](\d{1,2})",
@@ -68,8 +102,11 @@ def infer_date_from_filename(filename: str) -> str | None:
 
 
 def infer_etf_from_filename(filename: str) -> str | None:
+    standard_etf, _ = parse_standard_filename(filename)
+    if standard_etf:
+        return standard_etf
+
     upper = filename.upper()
-    # 先比對明確代號
     for hint, code in _ETF_FILENAME_HINTS:
         if hint.isascii():
             if hint.upper() in upper:

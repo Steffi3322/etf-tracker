@@ -23,7 +23,9 @@ from parser import (
     etf_label,
     holdings_to_dataframe,
     parse_holdings_file,
+    parse_standard_filename,
     parse_to_save_rows,
+    suggested_filename,
     validate_holdings,
 )
 
@@ -58,25 +60,41 @@ def _render_quality_metrics(quality: dict):
 
 with tab_upload:
     st.subheader("上傳持股")
-    st.caption(
-        "可一次拖入 1～多個檔案。建議檔名含代號與日期，例如 "
-        "`00400A_20260709.xlsx`。"
+
+    naming_date = st.date_input(
+        "今日建議檔名用的交易日",
+        datetime.date.today(),
+        key="naming_date",
+    )
+    st.markdown("#### 統一檔名（下載後先改名再上傳）")
+    st.caption("格式：`ETF代號_YYYYMMDD.xlsx` → 系統會自動存到對應 ETF × 交易日。")
+
+    name_cols = st.columns(4)
+    for col, code in zip(name_cols, etf_codes):
+        fname = suggested_filename(code, naming_date)
+        with col:
+            st.code(fname, language=None)
+            st.caption(SUPPORTED_ETFS[code])
+
+    st.info(
+        "盤後流程：官網下載 → 依上表改名 → 一次拖入四檔 → 確認寫入。"
+        "符合統一檔名時不需再手動選 ETF／日期。"
     )
 
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        fallback_etf = st.selectbox(
-            "檔名無法辨識時的預設 ETF",
-            etf_options,
-            key="upload_fallback_etf",
-        ).split(" ")[0]
-    with c2:
-        fallback_date = st.date_input(
-            "檔名無法辨識時的預設交易日",
-            datetime.date.today(),
-            key="upload_fallback_date",
-        )
-    with c3:
+    with st.expander("檔名無法辨識時的預設值（少用）"):
+        c1, c2 = st.columns(2)
+        with c1:
+            fallback_etf = st.selectbox(
+                "預設 ETF",
+                etf_options,
+                key="upload_fallback_etf",
+            ).split(" ")[0]
+        with c2:
+            fallback_date = st.date_input(
+                "預設交易日",
+                naming_date,
+                key="upload_fallback_date",
+            )
         allow_force = st.checkbox("允許權重異常仍寫入", key="upload_force")
 
     uploaded_files = st.file_uploader(
@@ -95,6 +113,7 @@ with tab_upload:
                 if hasattr(f, "seek"):
                     f.seek(0)
                 result = parse_holdings_file(f, f.name)
+                std_etf, std_date = parse_standard_filename(f.name)
                 etf_code = result.inferred_etf or fallback_etf
                 date_str = result.inferred_date or fallback_date.strftime("%Y-%m-%d")
                 quality = validate_holdings(result.holdings)
@@ -104,6 +123,15 @@ with tab_upload:
                 elif not quality["weight_ok"]:
                     status = "權重異常"
 
+                if std_etf and std_date:
+                    source = "統一檔名"
+                elif result.inferred_etf and result.inferred_date:
+                    source = "檔名推斷"
+                elif result.inferred_etf or result.inferred_date:
+                    source = "檔名+預設"
+                else:
+                    source = "預設值"
+
                 rows.append(
                     {
                         "檔名": f.name,
@@ -112,13 +140,7 @@ with tab_upload:
                         "成分股": quality["count"],
                         "權重加總%": quality["weight_sum"],
                         "狀態": status,
-                        "來源": (
-                            "檔名"
-                            if (result.inferred_etf and result.inferred_date)
-                            else "檔名+預設"
-                            if (result.inferred_etf or result.inferred_date)
-                            else "預設值"
-                        ),
+                        "歸檔依據": source,
                     }
                 )
                 parsed_items.append(
@@ -141,7 +163,7 @@ with tab_upload:
                         "成分股": 0,
                         "權重加總%": 0,
                         "狀態": f"錯誤: {e}",
-                        "來源": "—",
+                        "歸檔依據": "—",
                     }
                 )
                 parsed_items.append(None)
