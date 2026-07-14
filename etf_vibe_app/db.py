@@ -251,6 +251,39 @@ def clear_all_data():
     conn.close()
 
 
+def delete_snapshot(etf_code: str, date_str: str) -> int:
+    """刪除單一 ETF × 交易日的持股資料，回傳影響筆數（若後端有提供）。"""
+    conn = get_connection()
+    cur = conn.execute(
+        "DELETE FROM etf_holdings WHERE etf_code = ? AND date = ?",
+        (etf_code, date_str),
+    )
+    conn.commit()
+    affected = getattr(cur, "rowcount", -1)
+    conn.close()
+    return int(affected) if affected is not None else -1
+
+
+def list_snapshots(conn=None) -> pd.DataFrame:
+    """列出已存檔的 ETF × 日期摘要。"""
+    owns_conn = conn is None
+    if owns_conn:
+        conn = get_connection()
+    try:
+        return _read_sql(
+            conn,
+            """
+            SELECT etf_code, date, COUNT(*) AS holdings_count
+            FROM etf_holdings
+            GROUP BY etf_code, date
+            ORDER BY date DESC, etf_code ASC
+            """,
+        )
+    finally:
+        if owns_conn:
+            conn.close()
+
+
 def _read_sql(conn, sql, params=None) -> pd.DataFrame:
     cur = conn.execute(sql, params or [])
     cols = [d[0] for d in (cur.description or [])]
