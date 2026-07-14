@@ -5,6 +5,7 @@ import streamlit as st
 
 from analysis import summarize_etf_changes
 from db import get_coverage_matrix, get_holdings, get_holdings_for_dates, get_saved_dates
+from ui import COLORS, plotly_layout, render_etf_status_card, render_section
 
 
 def _has_any_data(conn, supported_etfs):
@@ -31,29 +32,39 @@ def _render_status_cards(summaries):
     for col, (code, info) in zip(cols, summaries.items()):
         summary = info["summary"]
         with col:
-            st.markdown(f"**{code}**")
-            st.caption(info["name"])
             if summary is None:
-                st.error("尚無資料")
+                render_etf_status_card(code, info["name"], empty=True)
                 continue
-            st.metric("最新交易日", summary["latest_date"])
             if summary["prev_date"]:
-                st.metric("今日異動", f"{summary['change_count']} 檔")
-                sub1, sub2 = st.columns(2)
-                sub1.metric("加碼", summary["add_count"])
-                sub2.metric("減碼", summary["reduce_count"])
+                top_buy = None
+                top_sell = None
                 if summary["top_buy"]:
-                    st.success(
-                        f"最大加碼：{summary['top_buy']['name']} "
-                        f"+{summary['top_buy']['lots']:.0f} 張"
+                    top_buy = (
+                        f"{summary['top_buy']['name']} "
+                        f"+{summary['top_buy']['lots']:.0f}張"
                     )
                 if summary["top_sell"]:
-                    st.warning(
-                        f"最大減碼：{summary['top_sell']['name']} "
-                        f"{summary['top_sell']['lots']:.0f} 張"
+                    top_sell = (
+                        f"{summary['top_sell']['name']} "
+                        f"{summary['top_sell']['lots']:.0f}張"
                     )
+                render_etf_status_card(
+                    code,
+                    info["name"],
+                    latest_date=summary["latest_date"],
+                    change_count=summary["change_count"],
+                    add_count=summary["add_count"],
+                    reduce_count=summary["reduce_count"],
+                    top_buy=top_buy,
+                    top_sell=top_sell,
+                )
             else:
-                st.info(f"僅 1 日資料，持股 {summary['holding_count']} 檔")
+                render_etf_status_card(
+                    code,
+                    info["name"],
+                    latest_date=summary["latest_date"],
+                    holding_count=summary["holding_count"],
+                )
 
 
 def _render_cross_etf_table(summaries):
@@ -88,7 +99,7 @@ def _render_cross_etf_table(summaries):
     )
     overlap = overlap[overlap["加碼ETF數"] >= 2].sort_values("加碼ETF數", ascending=False)
     if not overlap.empty:
-        st.markdown("#### 🔥 多檔 ETF 同步加碼")
+        render_section("多檔同步加碼", "兩檔以上主動 ETF 同日加碼的標的。")
         st.dataframe(overlap, use_container_width=True, hide_index=True)
 
 
@@ -123,10 +134,16 @@ def _render_change_bar_chart(summaries):
         y="標籤",
         color="顏色",
         orientation="h",
-        color_discrete_map={"加碼": "#2ecc71", "減碼": "#e67e22"},
-        title="四檔 ETF 最新異動 Top 加減碼",
+        color_discrete_map={"加碼": COLORS["buy"], "減碼": COLORS["sell"]},
+        title="最新異動 Top 加減碼",
     )
-    fig.update_layout(height=420, yaxis={"categoryorder": "total ascending"}, showlegend=False)
+    fig.update_layout(
+        **plotly_layout(
+            height=420,
+            yaxis={"categoryorder": "total ascending"},
+            showlegend=False,
+        )
+    )
     st.plotly_chart(fig, use_container_width=True)
 
 
@@ -150,9 +167,12 @@ def _render_treemap(conn, summaries, supported_etfs):
         holdings.head(20),
         path=["stock_name"],
         values="weight",
+        color="weight",
+        color_continuous_scale=["#e8f3ee", "#1f7a5c", "#0f2744"],
         title=f"{code} 持股權重 Top 20（{summary['latest_date']}）",
     )
     fig.update_traces(textinfo="label+percent parent")
+    fig.update_layout(**plotly_layout(coloraxis_showscale=False, height=420))
     st.plotly_chart(fig, use_container_width=True)
 
 
@@ -211,7 +231,11 @@ def _render_heatmap(conn, summaries, supported_etfs):
             z=delta_plot.values,
             x=[str(d) for d in change_dates],
             y=y_labels,
-            colorscale="RdYlGn",
+            colorscale=[
+                [0.0, COLORS["sell"]],
+                [0.5, "#f7f6f2"],
+                [1.0, COLORS["buy"]],
+            ],
             zmid=0,
             zmin=-zmax,
             zmax=zmax,
@@ -225,16 +249,18 @@ def _render_heatmap(conn, summaries, supported_etfs):
         )
     )
     fig.update_layout(
-        title=f"{code} 權重變動熱力圖（Top 15 · 相對前一有資料日）",
-        height=520,
-        margin=dict(l=20, r=90),
-        xaxis_title="交易日（相對前一日的變動）",
-        yaxis_title="股票（名稱旁＝區間累計變動百分點）",
-        xaxis={
-            "type": "category",
-            "categoryorder": "array",
-            "categoryarray": [str(d) for d in change_dates],
-        },
+        **plotly_layout(
+            title=f"{code} 權重變動熱力圖（Top 15）",
+            height=520,
+            margin=dict(l=20, r=90, t=48, b=16),
+            xaxis_title="交易日",
+            yaxis_title="",
+            xaxis={
+                "type": "category",
+                "categoryorder": "array",
+                "categoryarray": [str(d) for d in change_dates],
+            },
+        )
     )
     st.caption(
         "顏色＝權重變動（百分點，pt），不是張數、也不是當日權重本身。"
@@ -245,8 +271,7 @@ def _render_heatmap(conn, summaries, supported_etfs):
 
 
 def _render_coverage_calendar(conn, supported_etfs):
-    st.markdown("#### 📅 資料覆蓋日曆")
-    st.caption("綠＝已有資料，紅＝缺資料。一眼看出哪檔 ETF 還沒上傳。")
+    render_section("資料覆蓋日曆", "綠＝已上傳，紅＝缺資料。")
     matrix = get_coverage_matrix(conn, supported_etfs, recent_n=15)
     if matrix.empty:
         return
@@ -258,15 +283,19 @@ def _render_coverage_calendar(conn, supported_etfs):
             z=z,
             x=date_cols,
             y=matrix["ETF"].tolist(),
-            colorscale=[[0, "#e74c3c"], [1, "#27ae60"]],
+            colorscale=[[0, "#c45c26"], [1, COLORS["buy"]]],
             zmin=0,
             zmax=1,
             showscale=False,
             hovertemplate="%{y}<br>%{x}<br>%{customdata}<extra></extra>",
             customdata=[["有資料" if v == 1 else "缺資料" for v in row] for row in z],
+            xgap=2,
+            ygap=2,
         )
     )
-    fig.update_layout(height=220, margin=dict(l=10, r=10, t=10, b=10), xaxis_title="", yaxis_title="")
+    fig.update_layout(
+        **plotly_layout(height=220, margin=dict(l=10, r=10, t=10, b=10), title=None)
+    )
     st.plotly_chart(fig, use_container_width=True)
 
     missing = []
@@ -281,8 +310,7 @@ def _render_coverage_calendar(conn, supported_etfs):
 
 
 def render_dashboard(conn, supported_etfs):
-    st.subheader("🏠 四檔主動 ETF 操盤總覽")
-    st.caption("一眼掌握四檔 ETF 最新異動、跨檔重疊加碼與持股結構。")
+    render_section("四檔操盤總覽", "最新異動、跨檔加碼與持股結構。")
 
     if not _has_any_data(conn, supported_etfs):
         st.info("尚無任何 ETF 資料。請由管理員上傳持股明細。")
@@ -291,19 +319,18 @@ def render_dashboard(conn, supported_etfs):
     summaries = _collect_all_summaries(conn, supported_etfs)
     _render_status_cards(summaries)
 
-    st.write("---")
     _render_coverage_calendar(conn, supported_etfs)
 
-    st.write("---")
-    st.markdown("#### 📋 最新交易日異動明細（四檔合併）")
+    render_section("最新異動明細", "四檔合併檢視。")
     _render_cross_etf_table(summaries)
 
-    st.write("---")
     chart_col1, chart_col2 = st.columns(2)
     with chart_col1:
+        render_section("加減碼排行")
         _render_change_bar_chart(summaries)
     with chart_col2:
+        render_section("持股權重結構")
         _render_treemap(conn, summaries, supported_etfs)
 
-    st.write("---")
+    render_section("權重變動熱力圖", "相對前一交易日的權重變化（百分點）。")
     _render_heatmap(conn, summaries, supported_etfs)

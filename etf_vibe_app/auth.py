@@ -36,22 +36,31 @@ def require_admin() -> bool:
                 st.rerun()
         return True
 
-    st.title("🔐 管理後台")
+    from ui import inject_styles, render_hero
+
+    inject_styles()
+    render_hero(
+        "管理後台",
+        "上傳持股明細、檢視歸檔狀態。僅管理員可進入。",
+        kicker="Admin Access",
+        chips=["密碼保護", "盤後更新"],
+    )
     if not expected:
         st.warning(
             "尚未設定 `ADMIN_PASSWORD`（secrets 或環境變數）。"
             "本機開發模式已開放寫入權限；部署前請務必設定密碼。"
         )
-        if st.button("以開發模式進入"):
+        if st.button("以開發模式進入", type="primary"):
             st.session_state.admin_authenticated = True
             st.rerun()
         return False
 
-    st.caption("僅管理員可上傳持股明細或維護資料庫。")
-    password = st.text_input("管理密碼", type="password")
-    if st.button("登入"):
-        if hmac.compare_digest(password, expected):
-            st.session_state.admin_authenticated = True
-            st.rerun()
-        st.error("密碼錯誤")
+    col, _ = st.columns([1, 1])
+    with col:
+        password = st.text_input("管理密碼", type="password")
+        if st.button("登入", type="primary", use_container_width=True):
+            if hmac.compare_digest(password, expected):
+                st.session_state.admin_authenticated = True
+                st.rerun()
+            st.error("密碼錯誤")
     return False

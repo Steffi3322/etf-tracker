@@ -28,8 +28,10 @@ from parser import (
     suggested_filename_stem,
     validate_holdings,
 )
+from ui import inject_styles, render_filename_cards, render_hero, render_section
 
-st.set_page_config(page_title="ETF 追蹤 · 管理後台", layout="wide")
+st.set_page_config(page_title="ETF 追蹤 · 管理後台", layout="wide", page_icon="🗂️")
+inject_styles()
 init_db()
 
 if not require_admin():
@@ -83,13 +85,13 @@ def _show_flash_if_any():
         _dialog_action_done(flash)
 
 
-st.title("管理後台")
-st.caption("盤後上傳持股明細 · 檔名可自動推斷 ETF 與交易日")
-
-if using_turso():
-    st.success("已連線雲端資料庫（Turso）")
-else:
-    st.info("目前寫入本機 SQLite。部署多人查看前請設定 Turso secrets。")
+db_chip = "雲端資料庫已連線" if using_turso() else "本機 SQLite"
+render_hero(
+    "管理後台",
+    "盤後上傳持股明細；統一檔名即可自動歸檔到正確 ETF 與交易日。",
+    kicker="Admin Desk",
+    chips=[db_chip, "批量上傳", "資料管理"],
+)
 
 _show_flash_if_any()
 
@@ -109,30 +111,24 @@ def _render_quality_metrics(quality: dict):
 
 
 with tab_upload:
-    st.subheader("上傳持股")
+    render_section("上傳持股", "一次拖入單檔或多檔，依檔名自動歸檔。")
 
     naming_date = st.date_input(
-        "今日建議檔名用的交易日",
+        "建議檔名用的交易日",
         datetime.date.today(),
         key="naming_date",
     )
-    st.markdown("#### 統一檔名（下載後先改名再上傳）")
-    st.caption(
-        "格式：`ETF代號_YYYYMMDD`（不含副檔名，保留原檔的 .xlsx / .csv 即可）"
-        " → 系統會自動存到對應 ETF × 交易日。"
+    render_section(
+        "統一檔名",
+        "格式 ETF代號_YYYYMMDD（不含副檔名，保留原副檔名即可）。",
     )
-
-    name_cols = st.columns(4)
-    for col, code in zip(name_cols, etf_codes):
-        stem = suggested_filename_stem(code, naming_date)
-        with col:
-            st.code(stem, language=None)
-            st.caption(SUPPORTED_ETFS[code])
-
-    st.info(
-        "盤後流程：官網下載 → 只改檔名、副檔名不動 → 一次拖入四檔 → 確認寫入。"
-        "符合統一檔名時不需再手動選 ETF／日期。"
+    render_filename_cards(
+        [
+            (suggested_filename_stem(code, naming_date), SUPPORTED_ETFS[code])
+            for code in etf_codes
+        ]
     )
+    st.caption("流程：官網下載 → 只改檔名 → 一次拖入 → 確認寫入。")
 
     with st.expander("檔名無法辨識時的預設值（少用）"):
         c1, c2 = st.columns(2)
@@ -297,8 +293,7 @@ with tab_upload:
 
 
 with tab_data:
-    st.subheader("資料管理")
-    st.caption("查看已歸檔的持股日期；若某日上傳錯了，可刪除後重傳。")
+    render_section("資料管理", "查看已歸檔日期；錯傳可刪除單日後重傳。")
 
     conn = get_connection()
     snapshots = list_snapshots(conn)

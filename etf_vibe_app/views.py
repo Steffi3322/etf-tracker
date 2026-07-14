@@ -13,14 +13,15 @@ from analysis import (
     label_action,
 )
 from db import SUPPORTED_ETFS, get_holdings, get_holdings_for_dates, get_saved_dates
+from ui import render_section
 
 
 def render_detail_analysis(conn):
-    st.subheader("🔍 歷史操盤報告調閱區")
+    render_section("單檔深度分析", "自訂區間、移動矩陣與原始持股明細。")
 
     etf_options = [f"{code} {name}" for code, name in SUPPORTED_ETFS.items()]
     selected_view_etf_str = st.selectbox(
-        "📊 請選擇您要分析的主動式 ETF 商品", etf_options, key="view_etf_select"
+        "選擇主動式 ETF", etf_options, key="view_etf_select"
     )
     view_etf_code = selected_view_etf_str.split(" ")[0]
     valid_dates_list = get_saved_dates(conn, view_etf_code)
