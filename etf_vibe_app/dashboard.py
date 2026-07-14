@@ -172,12 +172,13 @@ def _render_treemap(conn, summaries, supported_etfs):
         holdings.head(20),
         path=["stock_name"],
         values="weight",
-        color="weight",
-        color_continuous_scale=["#f3faf6", "#9fd6c2", "#5aaa8a"],
         title=f"{code} 持股權重 Top 20（{summary['latest_date']}）",
     )
-    fig.update_traces(textinfo="label+percent parent")
-    fig.update_layout(**plotly_layout(coloraxis_showscale=False, height=420))
+    fig.update_traces(
+        textinfo="label+percent parent",
+        marker=dict(line=dict(width=1, color="rgba(255,255,255,0.85)")),
+    )
+    fig.update_layout(height=420, margin=dict(l=10, r=10, t=48, b=10))
     st.plotly_chart(fig, use_container_width=True)
 
 
