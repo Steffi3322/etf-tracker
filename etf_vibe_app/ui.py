@@ -40,13 +40,7 @@ CHART_PALETTE = [
 
 
 def inject_styles() -> None:
-    # 允許 CSS 更新後重新注入（避免 session 快取舊樣式）
-    style_ver = "etf-card-v6"
-    if st.session_state.get("_vibe_styles_ver") == style_ver:
-        return
-    st.session_state["_vibe_styles_ver"] = style_ver
-    st.session_state["_vibe_styles_injected"] = True
-
+    # Streamlit 每次 rerun 會清掉 DOM，樣式必須每次重新注入
     st.markdown(
         f"""
 <style>
