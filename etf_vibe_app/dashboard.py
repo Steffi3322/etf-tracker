@@ -29,13 +29,12 @@ def _collect_all_summaries(conn, supported_etfs):
 
 
 def _render_status_cards(summaries):
-    """原生卡片＋代號連結進入單檔分析（避免 HTML 被 Markdown 當成程式碼）。"""
+    """原生卡片；點代號進分析，點加碼／減碼數字只看該側異動。"""
     cols = st.columns(4, gap="medium")
     for col, (code, info) in zip(cols, summaries.items()):
         summary = info["summary"]
         with col:
             with st.container(border=True):
-                # 單行 markdown 連結，點代號即可進入
                 st.markdown(
                     f"[**{code}**](?etf={code})  \n"
                     f"<span style='color:#6b7a88;font-size:0.82rem'>{info['name']}</span>",
@@ -50,9 +49,22 @@ def _render_status_cards(summaries):
 
                 if summary["prev_date"]:
                     st.metric("今日異動", f"{summary['change_count']} 檔")
-                    a, b = st.columns(2)
-                    a.metric("加碼", summary["add_count"])
-                    b.metric("減碼", summary["reduce_count"])
+                    add_n = summary["add_count"]
+                    cut_n = summary["reduce_count"]
+                    # 單行 HTML，避免 Markdown 縮排變程式碼區塊
+                    st.markdown(
+                        (
+                            f'<div class="chg-pair">'
+                            f'<a class="chg-add" href="?etf={code}&chg=add">'
+                            f'<span class="chg-icon">▲</span>加碼'
+                            f'<strong>{add_n}</strong></a>'
+                            f'<a class="chg-cut" href="?etf={code}&chg=cut">'
+                            f'<span class="chg-icon">▼</span>減碼'
+                            f'<strong>{cut_n}</strong></a>'
+                            f"</div>"
+                        ),
+                        unsafe_allow_html=True,
+                    )
                     st.caption(
                         f"最大加碼 {summary['top_buy']['name']} "
                         f"+{summary['top_buy']['lots']:.0f} 張"
@@ -70,7 +82,7 @@ def _render_status_cards(summaries):
                     st.caption("僅單日資料，尚無異動可比對")
                     st.caption(" ")
 
-                st.caption("點代號進入分析")
+                st.caption("點代號看全部 · 點加碼／減碼看對應清單")
 
 
 def _render_cross_etf_table(summaries):
@@ -284,7 +296,10 @@ def _render_industry_donut(conn, summaries, supported_etfs):
 
 
 def render_dashboard(conn, supported_etfs):
-    render_section("四檔操盤總覽", "點擊卡片上的 ETF 代號即可進入單檔分析。")
+    render_section(
+        "四檔操盤總覽",
+        "點代號看全部分析；點 ▲加碼／▼減碼 只看該側異動。",
+    )
 
     if not _has_any_data(conn, supported_etfs):
         st.info("尚無任何 ETF 資料。請由管理員上傳持股明細。")

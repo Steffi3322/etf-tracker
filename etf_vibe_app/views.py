@@ -114,10 +114,34 @@ def render_detail_analysis(conn):
                         "期末權重(%)": df_period["w_end"].round(2),
                     }
                 )
-                df_period_show.index = range(1, len(df_period_show) + 1)
+
+                filter_opts = ["全部", "加碼", "減碼", "新進", "清倉"]
+                if "period_chg_filter" not in st.session_state:
+                    st.session_state["period_chg_filter"] = "全部"
+                elif st.session_state["period_chg_filter"] not in filter_opts:
+                    st.session_state["period_chg_filter"] = "全部"
+
+                chosen = st.pills(
+                    "異動篩選",
+                    filter_opts,
+                    key="period_chg_filter",
+                )
+
+                show = df_period_show
+                if chosen == "加碼":
+                    show = df_period_show[df_period_show["動向"].isin(["加碼", "新進"])]
+                elif chosen == "減碼":
+                    show = df_period_show[df_period_show["動向"].isin(["減碼", "清倉"])]
+                elif chosen in ("新進", "清倉"):
+                    show = df_period_show[df_period_show["動向"] == chosen]
+
+                show = show.copy()
+                show.index = range(1, len(show) + 1)
+                if chosen and chosen != "全部":
+                    st.info(f"目前顯示：{chosen}（共 {len(show)} 檔）")
                 st.caption("動向＝一眼定性；右側數字為實際張數與權重變化（pt＝百分點）。")
                 st.dataframe(
-                    df_period_show,
+                    show,
                     use_container_width=True,
                     column_config={
                         "動向": st.column_config.TextColumn(
@@ -136,7 +160,7 @@ def render_detail_analysis(conn):
                     },
                 )
 
-                csv_period = df_period_show.to_csv(index=False).encode("utf-8-sig")
+                csv_period = show.to_csv(index=False).encode("utf-8-sig")
                 st.download_button(
                     f"📥 匯出 {actual_start_str}～{actual_end_str} 精華操作報告",
                     csv_period,

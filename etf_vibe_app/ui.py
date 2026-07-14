@@ -41,7 +41,7 @@ CHART_PALETTE = [
 
 def inject_styles() -> None:
     # 允許 CSS 更新後重新注入（避免 session 快取舊樣式）
-    style_ver = "etf-card-v3"
+    style_ver = "etf-card-v4"
     if st.session_state.get("_vibe_styles_ver") == style_ver:
         return
     st.session_state["_vibe_styles_ver"] = style_ver
@@ -129,6 +129,51 @@ div[data-testid="stVerticalBlockBorderWrapper"] a {{
 div[data-testid="stVerticalBlockBorderWrapper"] a:hover {{
   color: {COLORS["jade_deep"]} !important;
   text-decoration: underline !important;
+}}
+
+.chg-pair {{
+  display: flex;
+  gap: 0.45rem;
+  margin: 0.35rem 0 0.55rem;
+}}
+.chg-pair a {{
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+  padding: 0.45rem 0.55rem;
+  border-radius: 10px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-decoration: none !important;
+  border: 1px solid transparent;
+}}
+.chg-pair a strong {{
+  font-family: "Fraunces", Georgia, serif;
+  font-size: 1.15rem;
+}}
+.chg-pair .chg-icon {{
+  margin-right: 0.15rem;
+  font-size: 0.75rem;
+}}
+a.chg-add {{
+  background: {COLORS["mint"]} !important;
+  color: {COLORS["jade_deep"]} !important;
+  border-color: #cfe8dc !important;
+}}
+a.chg-add:hover {{
+  border-color: {COLORS["jade"]} !important;
+  text-decoration: none !important;
+}}
+a.chg-cut {{
+  background: #f8ebe3 !important;
+  color: {COLORS["sell"]} !important;
+  border-color: #efd5c4 !important;
+}}
+a.chg-cut:hover {{
+  border-color: {COLORS["sell"]} !important;
+  text-decoration: none !important;
 }}
 
 div[data-testid="stTabs"] button[data-baseweb="tab"] {{
