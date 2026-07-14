@@ -6,7 +6,7 @@ import streamlit as st
 from analysis import summarize_etf_changes
 from db import get_holdings, get_holdings_for_dates, get_saved_dates
 from industry import attach_industry
-from ui import COLORS, plotly_layout, render_etf_status_card, render_section
+from ui import CHART_PALETTE, COLORS, plotly_layout, render_etf_status_card, render_section
 
 
 def _has_any_data(conn, supported_etfs):
@@ -169,7 +169,7 @@ def _render_treemap(conn, summaries, supported_etfs):
         path=["stock_name"],
         values="weight",
         color="weight",
-        color_continuous_scale=["#e8f3ee", "#1f7a5c", "#0f2744"],
+        color_continuous_scale=["#f3faf6", "#9fd6c2", "#5aaa8a"],
         title=f"{code} 持股權重 Top 20（{summary['latest_date']}）",
     )
     fig.update_traces(textinfo="label+percent parent")
@@ -177,111 +177,93 @@ def _render_treemap(conn, summaries, supported_etfs):
     st.plotly_chart(fig, use_container_width=True)
 
 
-def _render_industry_heatmap(conn, summaries, supported_etfs):
-    """依產業彙總權重，畫跨日產業權重變動熱力圖。"""
+def _render_industry_donut(conn, summaries, supported_etfs):
+    """最新交易日產業權重甜甜圈圖（右側圖例顯示百分比）。"""
     options = {
         f"{code} {info['name']}": code
         for code, info in summaries.items()
-        if len(info["dates"]) >= 2
+        if info["summary"] is not None
     }
     if not options:
-        st.info("產業分析需要至少兩個交易日資料。")
         return
 
     selected = st.selectbox(
-        "選擇 ETF 檢視產業動向", list(options.keys()), key="dash_industry_etf"
+        "選擇 ETF 檢視產業配置", list(options.keys()), key="dash_industry_etf"
     )
     code = options[selected]
-    dates = summaries[code]["dates"][-7:]
-    if len(dates) < 2:
-        st.info("此 ETF 資料不足兩個交易日，無法計算產業變動。")
+    latest = summaries[code]["summary"]["latest_date"]
+    holdings = get_holdings(conn, latest, code)
+    if holdings.empty:
         return
 
-    df_raw = get_holdings_for_dates(conn, code, dates)
-    if df_raw.empty:
-        return
-
-    df_ind = attach_industry(df_raw)
-    industry_pivot = (
-        df_ind.groupby(["industry", "date"], as_index=False)["weight"]
+    df_ind = attach_industry(holdings)
+    weights = (
+        df_ind.groupby("industry", as_index=False)["weight"]
         .sum()
-        .pivot_table(index="industry", columns="date", values="weight", aggfunc="sum")
-        .reindex(columns=dates)
-        .fillna(0.0)
+        .sort_values("weight", ascending=False)
     )
-    delta = industry_pivot.diff(axis=1).iloc[:, 1:]
-    change_dates = dates[1:]
-    if delta.empty or not change_dates:
-        return
+    # 過小產業合併，避免圖例過長
+    major = weights[weights["weight"] >= 0.5].copy()
+    other = weights[weights["weight"] < 0.5]["weight"].sum()
+    if other > 0:
+        major = pd.concat(
+            [major, pd.DataFrame([{"industry": "其他（合計）", "weight": other}])],
+            ignore_index=True,
+        )
 
-    # 有變動的產業優先；其餘依累計變動排序
-    cum = delta.sum(axis=1)
-    abs_move = delta.abs().sum(axis=1)
-    active = abs_move[abs_move > 0.01].index.tolist()
-    if not active:
-        active = abs_move.sort_values(ascending=False).head(8).index.tolist()
-    name_order = cum.reindex(active).sort_values(ascending=True).index.tolist()
-    delta_plot = delta.reindex(index=name_order)
-    y_labels = [f"{name}  累計{cum[name]:+.2f}pt" for name in name_order]
-
-    zmax = float(delta_plot.abs().to_numpy().max()) if not delta_plot.empty else 1.0
-    zmax = max(zmax, 0.1)
+    labels = major["industry"].tolist()
+    values = major["weight"].tolist()
+    colors = [CHART_PALETTE[i % len(CHART_PALETTE)] for i in range(len(labels))]
+    legend_text = [f"{lab}    {val:.2f}%" for lab, val in zip(labels, values)]
 
     fig = go.Figure(
-        data=go.Heatmap(
-            z=delta_plot.values,
-            x=[str(d) for d in change_dates],
-            y=y_labels,
-            colorscale=[
-                [0.0, COLORS["sell"]],
-                [0.5, "#f7f6f2"],
-                [1.0, COLORS["buy"]],
-            ],
-            zmid=0,
-            zmin=-zmax,
-            zmax=zmax,
-            colorbar={
-                "title": {"text": "產業權重變動", "side": "right"},
-                "ticksuffix": " pt",
-                "thickness": 14,
-                "len": 0.9,
-            },
-            hovertemplate="%{y}<br>%{x}<br>產業權重變動 %{z:+.2f} pt<extra></extra>",
-            xgap=2,
-            ygap=2,
-        )
+        data=[
+            go.Pie(
+                labels=legend_text,
+                values=values,
+                hole=0.62,
+                sort=False,
+                direction="clockwise",
+                marker=dict(colors=colors, line=dict(color="#ffffff", width=2)),
+                textinfo="none",
+                hovertemplate="%{label}<extra></extra>",
+                showlegend=True,
+            )
+        ]
     )
     fig.update_layout(
         **plotly_layout(
-            title=f"{code} 產業權重變動（相對前一交易日）",
-            height=max(360, 48 * len(name_order) + 120),
-            margin=dict(l=20, r=90, t=48, b=16),
-            xaxis_title="交易日",
-            yaxis_title="",
-            xaxis={
-                "type": "category",
-                "categoryorder": "array",
-                "categoryarray": [str(d) for d in change_dates],
-            },
+            title=f"{code} 產業配置（{latest}）",
+            height=460,
+            margin=dict(l=10, r=10, t=56, b=10),
+            showlegend=True,
+            legend=dict(
+                orientation="v",
+                yanchor="middle",
+                y=0.5,
+                xanchor="left",
+                x=1.02,
+                font=dict(size=13, color=COLORS["ink"]),
+                bgcolor="rgba(0,0,0,0)",
+                traceorder="normal",
+            ),
+            annotations=[
+                dict(
+                    text=f"<b>{code}</b><br><span style='font-size:12px;color:#6b7a88'>產業配置</span>",
+                    x=0.5,
+                    y=0.5,
+                    xref="paper",
+                    yref="paper",
+                    showarrow=False,
+                    font=dict(size=15, color=COLORS["ink"], family="Fraunces, Georgia, serif"),
+                )
+            ],
         )
     )
-    st.caption(
-        "將成分股依上市櫃產業別加總權重後，計算相對前一交易日的變動（百分點）。"
-        "綠＝該產業整體加碼、紅＝減碼。"
-    )
+    # 讓甜甜圈偏左，右側留給圖例
+    fig.update_traces(domain=dict(x=[0.0, 0.55], y=[0.05, 0.95]))
     st.plotly_chart(fig, use_container_width=True)
-
-    # 最新一日產業權重結構，輔助解讀熱力圖
-    latest = dates[-1]
-    latest_w = (
-        industry_pivot[latest]
-        .sort_values(ascending=False)
-        .reset_index()
-        .rename(columns={"industry": "產業", latest: "權重(%)"})
-    )
-    latest_w["權重(%)"] = latest_w["權重(%)"].round(2)
-    with st.expander(f"最新交易日產業權重結構（{latest}）"):
-        st.dataframe(latest_w, use_container_width=True, hide_index=True)
+    st.caption("依上市櫃產業別加總最新持股權重；淡色區段為主要配置，右側為產業與占比。")
 
 
 def render_dashboard(conn, supported_etfs):
@@ -305,5 +287,5 @@ def render_dashboard(conn, supported_etfs):
         render_section("持股權重結構")
         _render_treemap(conn, summaries, supported_etfs)
 
-    render_section("產業動向", "依產業彙總後的權重增減熱力圖。")
-    _render_industry_heatmap(conn, summaries, supported_etfs)
+    render_section("產業分析", "最新交易日產業配置占比。")
+    _render_industry_donut(conn, summaries, supported_etfs)

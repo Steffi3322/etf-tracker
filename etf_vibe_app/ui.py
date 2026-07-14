@@ -4,21 +4,39 @@ from __future__ import annotations
 
 import streamlit as st
 
-# Ink + jade: market desk feel, not purple / cream defaults
+# Soft ink + mist jade — lighter desk palette
 COLORS = {
-    "ink": "#0f2744",
-    "ink_soft": "#243b55",
-    "jade": "#1f7a5c",
-    "jade_deep": "#155a44",
-    "mint": "#e8f3ee",
-    "sand": "#f4f1ea",
-    "paper": "#f7f6f2",
-    "line": "#d7ddd8",
-    "buy": "#1f7a5c",
-    "sell": "#c45c26",
-    "muted": "#5c6b7a",
-    "danger": "#b42318",
+    "ink": "#243447",
+    "ink_soft": "#3a4d63",
+    "jade": "#3d8f72",
+    "jade_deep": "#2f735c",
+    "mint": "#eef7f2",
+    "sand": "#f7f4ee",
+    "paper": "#faf9f6",
+    "line": "#e2e7e3",
+    "buy": "#5aaa8a",
+    "sell": "#d0895c",
+    "muted": "#6b7a88",
+    "danger": "#c45b52",
 }
+
+# Soft pastel cycle for industry donut / categorical charts
+CHART_PALETTE = [
+    "#9fd6c2",
+    "#b7e0d4",
+    "#c9ebe0",
+    "#a8c9b8",
+    "#d7efe6",
+    "#8eb8d8",
+    "#b5d4ea",
+    "#d0e4f2",
+    "#c5d0a8",
+    "#e2d8c2",
+    "#d8c4b0",
+    "#cbbdcf",
+    "#e8d5c4",
+    "#b8c9c2",
+]
 
 
 def inject_styles() -> None:
@@ -37,9 +55,9 @@ html, body, [class*="css"] {{
 
 .stApp {{
   background:
-    radial-gradient(1200px 500px at 8% -10%, rgba(31, 122, 92, 0.14), transparent 55%),
-    radial-gradient(900px 420px at 92% 0%, rgba(15, 39, 68, 0.10), transparent 50%),
-    linear-gradient(180deg, {COLORS["paper"]} 0%, #eef2ef 100%);
+    radial-gradient(1100px 460px at 10% -8%, rgba(61, 143, 114, 0.08), transparent 55%),
+    radial-gradient(900px 400px at 90% 0%, rgba(36, 52, 71, 0.05), transparent 52%),
+    linear-gradient(180deg, {COLORS["paper"]} 0%, #f3f5f3 100%);
   color: {COLORS["ink"]};
 }}
 
@@ -49,13 +67,14 @@ html, body, [class*="css"] {{
 }}
 
 [data-testid="stSidebar"] {{
-  background: linear-gradient(180deg, #102a45 0%, #183552 100%);
+  background: linear-gradient(180deg, #f3f6f4 0%, #eef2f0 100%);
+  border-right: 1px solid {COLORS["line"]};
 }}
 [data-testid="stSidebar"] * {{
-  color: #eef3f7 !important;
+  color: {COLORS["ink"]} !important;
 }}
 [data-testid="stSidebar"] .stCaption, [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p {{
-  color: #c5d0da !important;
+  color: {COLORS["muted"]} !important;
 }}
 
 .block-container {{
@@ -119,16 +138,17 @@ div[data-testid="stTabs"] button[aria-selected="true"] {{
   padding: 1.55rem 1.7rem 1.4rem;
   margin-bottom: 1.1rem;
   background:
-    linear-gradient(135deg, rgba(15,39,68,0.96) 0%, rgba(24,58,84,0.94) 48%, rgba(31,122,92,0.88) 100%);
-  color: #f5f8fa;
-  box-shadow: 0 18px 40px rgba(15, 39, 68, 0.18);
+    linear-gradient(135deg, #eef4f0 0%, #e7f0eb 45%, #e3eaf1 100%);
+  color: {COLORS["ink"]};
+  border: 1px solid {COLORS["line"]};
+  box-shadow: 0 12px 28px rgba(36, 52, 71, 0.06);
 }}
 .vibe-hero::after {{
   content: "";
   position: absolute;
-  inset: auto -20% -55% 40%;
+  inset: auto -15% -60% 45%;
   height: 180px;
-  background: radial-gradient(circle, rgba(255,255,255,0.16), transparent 65%);
+  background: radial-gradient(circle, rgba(61, 143, 114, 0.16), transparent 65%);
   pointer-events: none;
 }}
 .vibe-kicker {{
@@ -137,19 +157,19 @@ div[data-testid="stTabs"] button[aria-selected="true"] {{
   font-weight: 600;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: rgba(232, 243, 238, 0.82);
+  color: {COLORS["jade_deep"]};
   margin-bottom: 0.45rem;
 }}
 .vibe-brand {{
   font-size: clamp(1.7rem, 2.4vw, 2.35rem);
   line-height: 1.15;
   margin: 0 0 0.45rem 0;
-  color: #fff !important;
+  color: {COLORS["ink"]} !important;
 }}
 .vibe-sub {{
   margin: 0;
   max-width: 42rem;
-  color: rgba(235, 242, 246, 0.88);
+  color: {COLORS["muted"]};
   font-size: 0.98rem;
   line-height: 1.55;
 }}
@@ -164,9 +184,9 @@ div[data-testid="stTabs"] button[aria-selected="true"] {{
   align-items: center;
   padding: 0.28rem 0.65rem;
   border-radius: 999px;
-  background: rgba(255,255,255,0.12);
-  border: 1px solid rgba(255,255,255,0.18);
-  color: #f3f7f5;
+  background: rgba(255,255,255,0.75);
+  border: 1px solid {COLORS["line"]};
+  color: {COLORS["ink_soft"]};
   font-size: 0.8rem;
   font-weight: 500;
 }}
