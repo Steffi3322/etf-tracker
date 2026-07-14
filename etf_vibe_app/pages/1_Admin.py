@@ -35,6 +35,54 @@ init_db()
 if not require_admin():
     st.stop()
 
+
+@st.dialog("寫入完成")
+def _dialog_save_done(payload: dict):
+    st.success(payload.get("title", "寫入完成"))
+    detail = payload.get("detail")
+    if detail:
+        st.write(detail)
+    rows = payload.get("rows") or []
+    if rows:
+        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+    st.caption("公開儀表板已可查看最新資料。")
+    if st.button("知道了", type="primary", key="flash_save_ok"):
+        st.session_state.pop("admin_flash", None)
+        st.rerun()
+
+
+@st.dialog("操作完成")
+def _dialog_action_done(payload: dict):
+    level = payload.get("level", "success")
+    msg = payload.get("title", "完成")
+    if level == "warning":
+        st.warning(msg)
+    else:
+        st.success(msg)
+    if payload.get("detail"):
+        st.write(payload["detail"])
+    if st.button("知道了", type="primary", key="flash_action_ok"):
+        st.session_state.pop("admin_flash", None)
+        st.rerun()
+
+
+def _set_flash(payload: dict):
+    st.session_state["admin_flash"] = payload
+
+
+def _show_flash_if_any():
+    flash = st.session_state.get("admin_flash")
+    if not flash:
+        return
+    kind = flash.get("kind")
+    if kind == "save":
+        st.toast(flash.get("title", "寫入完成"), icon="✅")
+        _dialog_save_done(flash)
+    elif kind in ("delete", "clear"):
+        st.toast(flash.get("title", "操作完成"), icon="✅")
+        _dialog_action_done(flash)
+
+
 st.title("管理後台")
 st.caption("盤後上傳持股明細 · 檔名可自動推斷 ETF 與交易日")
 
@@ -42,6 +90,8 @@ if using_turso():
     st.success("已連線雲端資料庫（Turso）")
 else:
     st.info("目前寫入本機 SQLite。部署多人查看前請設定 Turso secrets。")
+
+_show_flash_if_any()
 
 etf_codes = list(SUPPORTED_ETFS.keys())
 etf_options = [etf_label(c) for c in etf_codes]
@@ -222,12 +272,27 @@ with tab_upload:
             disabled=len(savable) == 0,
             key="upload_save",
         ):
-            saved = 0
+            saved_rows = []
             with st.spinner("寫入中…"):
                 for item in savable:
                     save_to_db(item["date"], item["etf"], parse_to_save_rows(item["holdings"]))
-                    saved += 1
-            st.success(f"已寫入 {saved} 筆。公開儀表板會立即反映。")
+                    saved_rows.append(
+                        {
+                            "ETF": item["etf"],
+                            "交易日": item["date"],
+                            "成分股": item["quality"]["count"],
+                            "檔名": item["file"].name,
+                        }
+                    )
+            _set_flash(
+                {
+                    "kind": "save",
+                    "title": f"已成功寫入 {len(saved_rows)} 筆",
+                    "detail": "下列資料已存入資料庫，儀表板可立即查看。",
+                    "rows": saved_rows,
+                }
+            )
+            st.balloons()
             st.rerun()
 
 
@@ -293,7 +358,14 @@ with tab_data:
             key="delete_one",
         ):
             delete_snapshot(del_etf, del_date)
-            st.success(f"已刪除 `{del_etf}` · `{del_date}`")
+            _set_flash(
+                {
+                    "kind": "delete",
+                    "level": "success",
+                    "title": f"已刪除 {del_etf} · {del_date}",
+                    "detail": "可回到「上傳持股」重新上傳正確檔案。",
+                }
+            )
             st.rerun()
 
     with st.expander("進階：清空全部資料（很少用）"):
@@ -302,7 +374,14 @@ with tab_data:
         if st.button("清空所有歷史數據", key="clear_btn"):
             if confirm == "CLEAR":
                 clear_all_data()
-                st.warning("資料庫已清空。")
+                _set_flash(
+                    {
+                        "kind": "clear",
+                        "level": "warning",
+                        "title": "資料庫已清空",
+                        "detail": "所有歷史持股資料都已刪除。",
+                    }
+                )
                 st.rerun()
             else:
                 st.error("請先輸入 CLEAR 以確認。")
