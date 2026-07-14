@@ -28,67 +28,68 @@ def _collect_all_summaries(conn, supported_etfs):
     return summaries
 
 
-def _open_etf_detail(code: str, name: str) -> None:
-    """從總覽卡片跳到單檔分析。"""
-    st.session_state["view_etf_select"] = f"{code} {name}"
-    st.session_state["main_nav"] = "單檔分析"
-    st.rerun()
+def _escape(text: str) -> str:
+    return (
+        str(text)
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+    )
 
 
 def _render_status_cards(summaries):
-    """四欄等結構卡片；可點擊進入該檔分析。"""
+    """可點整張卡片進入單檔分析（用連結，避免 Streamlit 按鈕）。"""
     cols = st.columns(4, gap="medium")
     for col, (code, info) in zip(cols, summaries.items()):
         summary = info["summary"]
+        name = _escape(info["name"])
         with col:
-            with st.container(border=True):
-                st.markdown(f"**{code}**")
-                st.caption(info["name"])
+            if summary is None:
+                body = '<div class="etf-card-empty">尚無資料</div>'
+            elif summary["prev_date"]:
+                top_buy = (
+                    f"最大加碼 {_escape(summary['top_buy']['name'])} "
+                    f"+{summary['top_buy']['lots']:.0f} 張"
+                    if summary["top_buy"]
+                    else "最大加碼 —"
+                )
+                top_sell = (
+                    f"最大減碼 {_escape(summary['top_sell']['name'])} "
+                    f"{summary['top_sell']['lots']:.0f} 張"
+                    if summary["top_sell"]
+                    else "最大減碼 —"
+                )
+                body = f"""
+                <div class="etf-card-date">最新 {_escape(summary['latest_date'])}</div>
+                <div class="etf-card-stat">{summary['change_count']}<span>檔異動</span></div>
+                <div class="etf-card-pills">
+                  <span class="etf-pill buy">加碼 {summary['add_count']}</span>
+                  <span class="etf-pill sell">減碼 {summary['reduce_count']}</span>
+                </div>
+                <div class="etf-card-note">{top_buy}</div>
+                <div class="etf-card-note">{top_sell}</div>
+                """
+            else:
+                body = f"""
+                <div class="etf-card-date">最新 {_escape(summary['latest_date'])}</div>
+                <div class="etf-card-stat">{summary['holding_count']}<span>檔持股</span></div>
+                <div class="etf-card-note">僅單日資料，尚無異動可比對</div>
+                """
 
-                if summary is None:
-                    st.error("尚無資料")
-                    st.button(
-                        "查看分析",
-                        key=f"open_{code}",
-                        disabled=True,
-                        use_container_width=True,
-                    )
-                    continue
-
-                st.caption(f"最新 {summary['latest_date']}")
-
-                if summary["prev_date"]:
-                    st.metric("今日異動", f"{summary['change_count']} 檔")
-                    a, b = st.columns(2)
-                    a.metric("加碼", summary["add_count"])
-                    b.metric("減碼", summary["reduce_count"])
-                    if summary["top_buy"]:
-                        st.caption(
-                            f"最大加碼 {summary['top_buy']['name']} "
-                            f"+{summary['top_buy']['lots']:.0f} 張"
-                        )
-                    else:
-                        st.caption("最大加碼 —")
-                    if summary["top_sell"]:
-                        st.caption(
-                            f"最大減碼 {summary['top_sell']['name']} "
-                            f"{summary['top_sell']['lots']:.0f} 張"
-                        )
-                    else:
-                        st.caption("最大減碼 —")
-                else:
-                    st.metric("持股檔數", summary["holding_count"])
-                    st.caption("僅單日資料，尚無異動可比對")
-                    st.caption(" ")
-                    st.caption(" ")
-
-                if st.button(
-                    "查看分析 →",
-                    key=f"open_{code}",
-                    use_container_width=True,
-                    type="secondary",
-                ):
-                    _open_etf_detail(code, info["name"])
+            st.markdown(
+                f"""
+<a class="etf-card-link" href="?etf={code}" target="_self">
+  <div class="etf-card">
+    <div class="etf-card-code">{code}</div>
+    <div class="etf-card-name">{name}</div>
+    {body}
+    <div class="etf-card-hint">點擊查看分析</div>
+  </div>
+</a>
+                """,
+                unsafe_allow_html=True,
+            )
 
 
 def _render_cross_etf_table(summaries):
@@ -291,7 +292,7 @@ def _render_industry_donut(conn, summaries, supported_etfs):
 
 
 def render_dashboard(conn, supported_etfs):
-    render_section("四檔操盤總覽", "點卡片下方「查看分析」可進入該檔詳情。")
+    render_section("四檔操盤總覽", "點擊任一檔卡片即可進入單檔分析。")
 
     if not _has_any_data(conn, supported_etfs):
         st.info("尚無任何 ETF 資料。請由管理員上傳持股明細。")

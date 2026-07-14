@@ -16,6 +16,15 @@ st.set_page_config(
 inject_styles()
 init_db()
 
+# 總覽卡片以 ?etf= 連到單檔分析（須在導覽 widget 建立前處理）
+etf_param = st.query_params.get("etf")
+if etf_param:
+    code = etf_param if isinstance(etf_param, str) else str(etf_param)
+    if code in SUPPORTED_ETFS:
+        st.session_state["view_etf_select"] = f"{code} {SUPPORTED_ETFS[code]}"
+        st.session_state["main_nav"] = "單檔分析"
+    st.query_params.clear()
+
 render_hero(
     "主動式 ETF 盤後追蹤",
     "公開唯讀儀表板 · 資料由管理員盤後更新",

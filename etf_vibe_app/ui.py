@@ -40,8 +40,11 @@ CHART_PALETTE = [
 
 
 def inject_styles() -> None:
-    if st.session_state.get("_vibe_styles_injected"):
+    # 允許 CSS 更新後重新注入（避免 session 快取舊樣式）
+    style_ver = "etf-card-v2"
+    if st.session_state.get("_vibe_styles_ver") == style_ver:
         return
+    st.session_state["_vibe_styles_ver"] = style_ver
     st.session_state["_vibe_styles_injected"] = True
 
     st.markdown(
@@ -114,6 +117,95 @@ div[data-testid="stCode"] {{
 div[data-testid="stCode"] code {{
   color: {COLORS["jade_deep"]} !important;
   font-weight: 700;
+}}
+
+a.etf-card-link {{
+  text-decoration: none !important;
+  color: inherit !important;
+  display: block;
+  height: 100%;
+}}
+.etf-card {{
+  background: rgba(255,255,255,0.92);
+  border: 1px solid {COLORS["line"]};
+  border-radius: 16px;
+  padding: 1rem 1rem 0.85rem;
+  height: 100%;
+  min-height: 220px;
+  box-shadow: 0 8px 20px rgba(36, 52, 71, 0.04);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+  cursor: pointer;
+}}
+a.etf-card-link:hover .etf-card {{
+  border-color: {COLORS["jade"]};
+  box-shadow: 0 12px 28px rgba(61, 143, 114, 0.14);
+  transform: translateY(-2px);
+}}
+.etf-card-code {{
+  font-family: "Fraunces", Georgia, serif;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: {COLORS["ink"]};
+}}
+.etf-card-name {{
+  color: {COLORS["muted"]};
+  font-size: 0.82rem;
+  margin: 0.15rem 0 0.75rem;
+}}
+.etf-card-date {{
+  font-size: 0.78rem;
+  color: {COLORS["muted"]};
+}}
+.etf-card-stat {{
+  font-family: "Fraunces", Georgia, serif;
+  font-size: 1.55rem;
+  font-weight: 700;
+  color: {COLORS["ink"]};
+  line-height: 1.15;
+  margin: 0.15rem 0 0.55rem;
+}}
+.etf-card-stat span {{
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: {COLORS["muted"]};
+  margin-left: 0.2rem;
+}}
+.etf-card-pills {{
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.45rem;
+}}
+.etf-pill {{
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+}}
+.etf-pill.buy {{
+  background: {COLORS["mint"]};
+  color: {COLORS["jade_deep"]};
+}}
+.etf-pill.sell {{
+  background: #f8ebe3;
+  color: {COLORS["sell"]};
+}}
+.etf-card-note {{
+  font-size: 0.78rem;
+  color: {COLORS["ink_soft"]};
+  line-height: 1.35;
+  margin-top: 0.15rem;
+}}
+.etf-card-empty {{
+  color: {COLORS["danger"]};
+  font-weight: 600;
+  margin-top: 0.6rem;
+}}
+.etf-card-hint {{
+  margin-top: 0.75rem;
+  font-size: 0.75rem;
+  color: {COLORS["jade"]};
+  font-weight: 600;
 }}
 
 div[data-testid="stTabs"] button[data-baseweb="tab"] {{
