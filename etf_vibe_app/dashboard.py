@@ -4,7 +4,8 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from analysis import summarize_etf_changes
-from db import get_coverage_matrix, get_holdings, get_holdings_for_dates, get_saved_dates
+from db import get_holdings, get_holdings_for_dates, get_saved_dates
+from industry import attach_industry
 from ui import COLORS, plotly_layout, render_etf_status_card, render_section
 
 
@@ -176,51 +177,51 @@ def _render_treemap(conn, summaries, supported_etfs):
     st.plotly_chart(fig, use_container_width=True)
 
 
-def _render_heatmap(conn, summaries, supported_etfs):
-    """跨日權重變動熱力圖（Δ 百分點），與 Treemap 的「當日權重切面」互補。"""
+def _render_industry_heatmap(conn, summaries, supported_etfs):
+    """依產業彙總權重，畫跨日產業權重變動熱力圖。"""
     options = {
         f"{code} {info['name']}": code
         for code, info in summaries.items()
         if len(info["dates"]) >= 2
     }
     if not options:
-        st.info("權重變動熱力圖需要至少兩個交易日資料。")
+        st.info("產業分析需要至少兩個交易日資料。")
         return
 
     selected = st.selectbox(
-        "選擇 ETF 檢視權重變動熱力圖", list(options.keys()), key="dash_heatmap_etf"
+        "選擇 ETF 檢視產業動向", list(options.keys()), key="dash_industry_etf"
     )
     code = options[selected]
     dates = summaries[code]["dates"][-7:]
     if len(dates) < 2:
-        st.info("此 ETF 資料不足兩個交易日，無法計算權重變動。")
+        st.info("此 ETF 資料不足兩個交易日，無法計算產業變動。")
         return
 
     df_raw = get_holdings_for_dates(conn, code, dates)
     if df_raw.empty:
         return
 
-    weight_pivot = (
-        df_raw.pivot_table(
-            index="stock_name", columns="date", values="weight", aggfunc="first"
-        )
+    df_ind = attach_industry(df_raw)
+    industry_pivot = (
+        df_ind.groupby(["industry", "date"], as_index=False)["weight"]
+        .sum()
+        .pivot_table(index="industry", columns="date", values="weight", aggfunc="sum")
         .reindex(columns=dates)
         .fillna(0.0)
     )
-    # 相對前一個有資料交易日的權重變動（百分點）
-    delta = weight_pivot.diff(axis=1).iloc[:, 1:]
+    delta = industry_pivot.diff(axis=1).iloc[:, 1:]
     change_dates = dates[1:]
     if delta.empty or not change_dates:
         return
 
-    # Top 15：區間內絕對變動總和最大者
-    abs_move = delta.abs().sum(axis=1).sort_values(ascending=False)
-    top_names = abs_move.head(15).index.tolist()
-    delta_top = delta.reindex(index=top_names)
-    # 由小到大（底部減碼紅 → 頂部加碼綠）
-    cum = delta_top.sum(axis=1)
-    name_order = cum.sort_values(ascending=True).index.tolist()
-    delta_plot = delta_top.reindex(index=name_order)
+    # 有變動的產業優先；其餘依累計變動排序
+    cum = delta.sum(axis=1)
+    abs_move = delta.abs().sum(axis=1)
+    active = abs_move[abs_move > 0.01].index.tolist()
+    if not active:
+        active = abs_move.sort_values(ascending=False).head(8).index.tolist()
+    name_order = cum.reindex(active).sort_values(ascending=True).index.tolist()
+    delta_plot = delta.reindex(index=name_order)
     y_labels = [f"{name}  累計{cum[name]:+.2f}pt" for name in name_order]
 
     zmax = float(delta_plot.abs().to_numpy().max()) if not delta_plot.empty else 1.0
@@ -240,18 +241,20 @@ def _render_heatmap(conn, summaries, supported_etfs):
             zmin=-zmax,
             zmax=zmax,
             colorbar={
-                "title": {"text": "權重變動", "side": "right"},
+                "title": {"text": "產業權重變動", "side": "right"},
                 "ticksuffix": " pt",
                 "thickness": 14,
                 "len": 0.9,
             },
-            hovertemplate="%{y}<br>相對前一交易日 %{x}<br>權重變動 %{z:+.2f} pt<extra></extra>",
+            hovertemplate="%{y}<br>%{x}<br>產業權重變動 %{z:+.2f} pt<extra></extra>",
+            xgap=2,
+            ygap=2,
         )
     )
     fig.update_layout(
         **plotly_layout(
-            title=f"{code} 權重變動熱力圖（Top 15）",
-            height=520,
+            title=f"{code} 產業權重變動（相對前一交易日）",
+            height=max(360, 48 * len(name_order) + 120),
             margin=dict(l=20, r=90, t=48, b=16),
             xaxis_title="交易日",
             yaxis_title="",
@@ -263,50 +266,22 @@ def _render_heatmap(conn, summaries, supported_etfs):
         )
     )
     st.caption(
-        "顏色＝權重變動（百分點，pt），不是張數、也不是當日權重本身。"
-        "綠＝相對前一交易日加碼、紅＝減碼；與上方 Treemap（當日權重結構）互補。"
-        "左側累計數字為所選區間內每日變動加總。"
+        "將成分股依上市櫃產業別加總權重後，計算相對前一交易日的變動（百分點）。"
+        "綠＝該產業整體加碼、紅＝減碼。"
     )
     st.plotly_chart(fig, use_container_width=True)
 
-
-def _render_coverage_calendar(conn, supported_etfs):
-    render_section("資料覆蓋日曆", "綠＝已上傳，紅＝缺資料。")
-    matrix = get_coverage_matrix(conn, supported_etfs, recent_n=15)
-    if matrix.empty:
-        return
-
-    date_cols = [c for c in matrix.columns if c != "ETF"]
-    z = matrix[date_cols].values
-    fig = go.Figure(
-        data=go.Heatmap(
-            z=z,
-            x=date_cols,
-            y=matrix["ETF"].tolist(),
-            colorscale=[[0, "#c45c26"], [1, COLORS["buy"]]],
-            zmin=0,
-            zmax=1,
-            showscale=False,
-            hovertemplate="%{y}<br>%{x}<br>%{customdata}<extra></extra>",
-            customdata=[["有資料" if v == 1 else "缺資料" for v in row] for row in z],
-            xgap=2,
-            ygap=2,
-        )
+    # 最新一日產業權重結構，輔助解讀熱力圖
+    latest = dates[-1]
+    latest_w = (
+        industry_pivot[latest]
+        .sort_values(ascending=False)
+        .reset_index()
+        .rename(columns={"industry": "產業", latest: "權重(%)"})
     )
-    fig.update_layout(
-        **plotly_layout(height=220, margin=dict(l=10, r=10, t=10, b=10), title=None)
-    )
-    st.plotly_chart(fig, use_container_width=True)
-
-    missing = []
-    for _, row in matrix.iterrows():
-        gaps = [d for d in date_cols if row[d] == 0]
-        if gaps:
-            missing.append(f"{row['ETF']}：缺 {len(gaps)} 日（最近缺：{gaps[-1]}）")
-    if missing:
-        st.warning(" / ".join(missing))
-    else:
-        st.success("近期待追蹤區間內四檔資料齊全。")
+    latest_w["權重(%)"] = latest_w["權重(%)"].round(2)
+    with st.expander(f"最新交易日產業權重結構（{latest}）"):
+        st.dataframe(latest_w, use_container_width=True, hide_index=True)
 
 
 def render_dashboard(conn, supported_etfs):
@@ -319,8 +294,6 @@ def render_dashboard(conn, supported_etfs):
     summaries = _collect_all_summaries(conn, supported_etfs)
     _render_status_cards(summaries)
 
-    _render_coverage_calendar(conn, supported_etfs)
-
     render_section("最新異動明細", "四檔合併檢視。")
     _render_cross_etf_table(summaries)
 
@@ -332,5 +305,5 @@ def render_dashboard(conn, supported_etfs):
         render_section("持股權重結構")
         _render_treemap(conn, summaries, supported_etfs)
 
-    render_section("權重變動熱力圖", "相對前一交易日的權重變化（百分點）。")
-    _render_heatmap(conn, summaries, supported_etfs)
+    render_section("產業動向", "依產業彙總後的權重增減熱力圖。")
+    _render_industry_heatmap(conn, summaries, supported_etfs)
