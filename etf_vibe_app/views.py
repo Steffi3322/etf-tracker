@@ -182,43 +182,49 @@ def render_detail_analysis(conn):
             st.info("💡 目前尚無歷史數據。")
         else:
             df_matrix_raw = get_holdings_for_dates(conn, view_etf_code, recent_dates)
+            # 同代號跨日名稱可能有「國巨 / 國巨*」差異，一律以代號合併
+            from parser import normalize_stock_name
+
+            df_matrix_raw = df_matrix_raw.copy()
+            df_matrix_raw["stock_name"] = df_matrix_raw["stock_name"].map(normalize_stock_name)
             df_matrix_raw["張數_float"] = df_matrix_raw["shares"] / 1000
 
+            name_map = (
+                df_matrix_raw.sort_values("date")
+                .groupby("stock_code", as_index=True)["stock_name"]
+                .agg(lambda s: next((x for x in reversed(list(s)) if x), ""))
+            )
+
             df_pivot = (
-                df_matrix_raw.pivot(
-                    index=["stock_code", "stock_name"], columns="date", values="張數_float"
+                df_matrix_raw.pivot_table(
+                    index="stock_code",
+                    columns="date",
+                    values="張數_float",
+                    aggfunc="sum",
                 )
-                .reset_index()
+                .reindex(columns=recent_dates)
                 .fillna(0.0)
+                .reset_index()
             )
             df_pivot.columns.name = None
+            df_pivot["stock_name"] = df_pivot["stock_code"].map(name_map)
 
-            time_cols = [col for col in df_pivot.columns if col not in ["stock_code", "stock_name"]]
-            for col in time_cols:
-                df_pivot[col] = df_pivot[col].apply(lambda x: "{:,.0f}".format(x))
-
-            df_pivot_for_sort = (
-                df_matrix_raw.pivot(
-                    index=["stock_code", "stock_name"], columns="date", values="張數_float"
-                )
-                .reset_index()
-                .fillna(0.0)
-            )
-            df_pivot_for_sort.columns.name = None
+            time_cols = [col for col in recent_dates]
             latest_date_col = recent_dates[-1]
-            df_pivot_for_sort["sort_key"] = df_pivot_for_sort[latest_date_col]
-
-            df_final_merged = pd.merge(
-                df_pivot_for_sort[["stock_code", "sort_key"]], df_pivot, on="stock_code", how="right"
-            )
-            df_matrix_sorted = df_final_merged.sort_values(by="sort_key", ascending=False).drop(
+            df_pivot["sort_key"] = df_pivot[latest_date_col]
+            df_matrix_sorted = df_pivot.sort_values(by="sort_key", ascending=False).drop(
                 columns=["sort_key"]
             )
-            df_matrix_final = df_matrix_sorted.rename(
-                columns={"stock_code": "股票代號", "stock_name": "股票名稱"}
-            )
+
+            for col in time_cols:
+                df_matrix_sorted[col] = df_matrix_sorted[col].apply(lambda x: "{:,.0f}".format(x))
+
+            df_matrix_final = df_matrix_sorted[
+                ["stock_code", "stock_name", *time_cols]
+            ].rename(columns={"stock_code": "股票代號", "stock_name": "股票名稱"})
             df_matrix_final.index = range(1, len(df_matrix_final) + 1)
 
+            st.caption("同一股票代號會合併顯示（自動忽略名稱註記如 *）。")
             st.dataframe(df_matrix_final, use_container_width=True, height=500)
             csv_matrix = df_matrix_final.to_csv(index=False).encode("utf-8-sig")
             st.download_button(

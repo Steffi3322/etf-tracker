@@ -216,7 +216,7 @@ def _parse_with_headers(df_raw: pd.DataFrame, header_map: dict[str, int]) -> lis
         if shares <= 0:
             continue
 
-        holdings.append((code, name, weight, shares))
+        holdings.append(_normalize_holding_row(code, name, weight, shares))
 
     return _dedupe(holdings)
 
@@ -273,7 +273,9 @@ def _parse_heuristic_rows(df_raw: pd.DataFrame) -> list[tuple]:
                 and "總計" not in stock_name
                 and shares > 0
             ):
-                parsed_portfolio.append((stock_code, stock_name, weight, shares))
+                parsed_portfolio.append(
+                    _normalize_holding_row(stock_code, stock_name, weight, shares)
+                )
                 break
 
     return _dedupe(parsed_portfolio)
@@ -288,6 +290,28 @@ def _dedupe(holdings: list[tuple]) -> list[tuple]:
             unique.append(item)
     return unique
 
+
+def normalize_stock_code(code: str | None) -> str:
+    """統一股票代號格式。"""
+    return str(code or "").split(".")[0].strip()
+
+
+def normalize_stock_name(name: str | None) -> str:
+    """去掉投信註記用的 *／＊ 與多餘空白，避免同代號被拆成兩列。"""
+    text = str(name or "").strip()
+    # 常見註記：國巨*、台積電＊
+    text = text.replace("＊", "").replace("*", "").replace("※", "")
+    text = re.sub(r"\s+", "", text)
+    return text
+
+
+def _normalize_holding_row(code, name, weight, shares) -> tuple:
+    return (
+        normalize_stock_code(code),
+        normalize_stock_name(name),
+        weight,
+        shares,
+    )
 
 def parse_holdings_file(
     uploaded_file: BinaryIO,
@@ -380,9 +404,12 @@ def holdings_to_dataframe(holdings: list[tuple]) -> pd.DataFrame:
 
 def parse_to_save_rows(holdings: list[tuple]) -> list[tuple]:
     df = holdings_to_dataframe(holdings)
-    return list(
-        df[["股票代號", "股票名稱", "權重(%)", "總股數"]].itertuples(index=False, name=None)
-    )
+    rows = []
+    for code, name, weight, shares in df[
+        ["股票代號", "股票名稱", "權重(%)", "總股數"]
+    ].itertuples(index=False, name=None):
+        rows.append(_normalize_holding_row(code, name, weight, shares))
+    return rows
 
 
 def etf_label(code: str) -> str:
