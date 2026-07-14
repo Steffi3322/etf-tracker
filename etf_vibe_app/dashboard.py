@@ -43,13 +43,6 @@ def _escape_html(text: str) -> str:
     )
 
 
-def _nav_to_etf(code: str, name: str) -> None:
-    """整卡點擊：進入該檔全部異動明細。"""
-    st.session_state["view_etf_select"] = f"{code} {name}"
-    st.session_state["main_nav"] = "單檔分析"
-    st.session_state["period_chg_filter"] = "全部"
-
-
 def _render_status_cards(summaries):
     """整張卡片可點，進入該檔變動明細（不分加碼／減碼）。"""
     cols = st.columns(4, gap="medium")
