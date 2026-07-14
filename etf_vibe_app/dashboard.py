@@ -99,6 +99,7 @@ def _render_status_cards(summaries):
                 f'<div class="etf-card-code">{code}</div>'
                 f'<div class="etf-card-name">{_escape_html(info["name"])}</div>'
                 f"{body}"
+                f'<div class="etf-card-hint">點擊查看異動明細</div>'
                 f"</div>"
             )
             with st.container(border=False, key=f"etf_card_{code}"):
@@ -106,8 +107,9 @@ def _render_status_cards(summaries):
                     st.html(card_html)
                 else:
                     st.markdown(card_html, unsafe_allow_html=True)
+                # 透明全卡按鈕：整張可點，仍走 session（不改 URL）
                 st.button(
-                    "點擊查看異動明細",
+                    f"查看 {code} 異動明細",
                     key=f"go_{code}",
                     use_container_width=True,
                     on_click=_nav_to_etf,

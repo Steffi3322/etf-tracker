@@ -113,28 +113,35 @@ div[data-testid="stCode"] code {{
   font-weight: 700;
 }}
 
-/* 總覽卡片：外框 + 底部綠字按鈕（session 跳轉，不改 URL） */
+/* 總覽卡片：整卡可點（透明按鈕覆蓋，session 跳轉不改 URL） */
 div[class*="st-key-etf_card_"][data-testid="stVerticalBlock"] {{
+  position: relative !important;
   background: rgba(255,255,255,0.94) !important;
   border: 1px solid {COLORS["line"]} !important;
   border-radius: 16px !important;
   box-shadow: 0 8px 20px rgba(36, 52, 71, 0.04) !important;
-  padding: 0.85rem 0.85rem 0.65rem !important;
+  padding: 1rem 1rem 0.85rem !important;
   height: 100%;
   transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.12s ease;
 }}
-div[class*="st-key-etf_card_"][data-testid="stVerticalBlock"]:hover {{
+div[class*="st-key-etf_card_"][data-testid="stVerticalBlock"]:hover,
+div[class*="st-key-etf_card_"][data-testid="stVerticalBlock"]:has(button:hover) {{
   border-color: {COLORS["jade"]} !important;
   box-shadow: 0 12px 28px rgba(61, 143, 114, 0.14) !important;
   transform: translateY(-2px);
+}}
+div[class*="st-key-etf_card_"][data-testid="stVerticalBlock"]:has(button:active) {{
+  transform: scale(0.985) translateY(0);
+  box-shadow: 0 4px 12px rgba(36, 52, 71, 0.08) !important;
 }}
 .etf-card {{
   background: transparent;
   border: none;
   border-radius: 0;
   padding: 0;
-  min-height: 0;
+  min-height: 210px;
   box-shadow: none;
+  pointer-events: none; /* 點擊穿透到下方透明按鈕 */
 }}
 .etf-card-code {{
   font-family: "Fraunces", Georgia, serif;
@@ -191,28 +198,35 @@ div[class*="st-key-etf_card_"][data-testid="stVerticalBlock"]:hover {{
   line-height: 1.35;
   margin-top: 0.15rem;
 }}
-div[class*="st-key-etf_card_"] .stButton {{
-  margin-top: 0.55rem;
+.etf-card-hint {{
+  margin-top: 0.85rem;
+  font-size: 0.75rem;
+  color: {COLORS["jade"]};
+  font-weight: 600;
 }}
-div[class*="st-key-go_"] button,
-div[class*="st-key-etf_card_"] .stButton > button {{
+/* 透明全卡熱區 */
+div[class*="st-key-etf_card_"] [class*="st-key-go_"] {{
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 2;
+  margin: 0 !important;
+  height: auto !important;
+}}
+div[class*="st-key-etf_card_"] [class*="st-key-go_"] > div,
+div[class*="st-key-etf_card_"] [class*="st-key-go_"] .stButton {{
+  height: 100% !important;
+  margin: 0 !important;
+}}
+div[class*="st-key-etf_card_"] [class*="st-key-go_"] button {{
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 100% !important;
+  opacity: 0 !important;
+  cursor: pointer !important;
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
-  color: {COLORS["jade"]} !important;
-  font-weight: 600 !important;
-  font-size: 0.82rem !important;
-  padding: 0.35rem 0 !important;
-  min-height: 0 !important;
-  justify-content: flex-start !important;
-}}
-div[class*="st-key-etf_card_"] .stButton > button:hover {{
-  color: {COLORS["jade_deep"]} !important;
-  background: transparent !important;
-  border: none !important;
-}}
-div[class*="st-key-etf_card_"] .stButton > button:active {{
-  transform: scale(0.98);
+  padding: 0 !important;
 }}
 
 /* 舊加碼／減碼按鈕樣式不再使用 */
