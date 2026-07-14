@@ -89,18 +89,31 @@ h1, h2, h3, .vibe-brand {{
   color: {COLORS["ink"]} !important;
 }}
 
-[data-testid="stMetric"] {{
-  background: rgba(255,255,255,0.72);
-  border: 1px solid {COLORS["line"]};
-  border-radius: 14px;
-  padding: 0.75rem 0.9rem;
-}}
 [data-testid="stMetricValue"] {{
   font-family: "Fraunces", Georgia, serif;
   color: {COLORS["ink"]};
 }}
 [data-testid="stMetricLabel"] {{
   color: {COLORS["muted"]};
+}}
+
+/* 總覽四卡對齊：容器內 quanta 更緊 */
+div[data-testid="stVerticalBlockBorderWrapper"] {{
+  background: rgba(255,255,255,0.88);
+  height: 100%;
+}}
+div[data-testid="stVerticalBlockBorderWrapper"] [data-testid="stMetric"] {{
+  background: transparent;
+  padding: 0.15rem 0;
+}}
+div[data-testid="stCode"] {{
+  background: {COLORS["mint"]} !important;
+  border: 1px solid {COLORS["line"]};
+  border-radius: 10px;
+}}
+div[data-testid="stCode"] code {{
+  color: {COLORS["jade_deep"]} !important;
+  font-weight: 700;
 }}
 
 div[data-testid="stTabs"] button[data-baseweb="tab"] {{

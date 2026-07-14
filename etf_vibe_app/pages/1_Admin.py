@@ -28,7 +28,7 @@ from parser import (
     suggested_filename_stem,
     validate_holdings,
 )
-from ui import inject_styles, render_filename_cards, render_hero, render_section
+from ui import inject_styles, render_hero, render_section
 
 st.set_page_config(page_title="ETF 追蹤 · 管理後台", layout="wide", page_icon="🗂️")
 inject_styles()
@@ -120,14 +120,13 @@ with tab_upload:
     )
     render_section(
         "統一檔名",
-        "格式 ETF代號_YYYYMMDD（不含副檔名，保留原副檔名即可）。",
+        "格式 ETF代號_YYYYMMDD（不含副檔名）。點右上角圖示即可複製。",
     )
-    render_filename_cards(
-        [
-            (suggested_filename_stem(code, naming_date), SUPPORTED_ETFS[code])
-            for code in etf_codes
-        ]
-    )
+    name_cols = st.columns(4)
+    for col, code in zip(name_cols, etf_codes):
+        with col:
+            st.code(suggested_filename_stem(code, naming_date), language=None)
+            st.caption(SUPPORTED_ETFS[code])
     st.caption("流程：官網下載 → 只改檔名 → 一次拖入 → 確認寫入。")
 
     with st.expander("檔名無法辨識時的預設值（少用）"):

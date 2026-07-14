@@ -18,9 +18,9 @@ init_db()
 
 render_hero(
     "主動式 ETF 盤後追蹤",
-    "公開唯讀儀表板，掌握四檔主動 ETF 持股異動、跨檔加碼與權重結構。",
+    "公開唯讀儀表板 · 資料由管理員盤後更新",
     kicker="Taiwan Active ETF Desk",
-    chips=[f"{c} {n}" for c, n in SUPPORTED_ETFS.items()],
+    chips=list(SUPPORTED_ETFS.keys()),
 )
 
 with st.sidebar:

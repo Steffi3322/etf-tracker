@@ -6,7 +6,7 @@ import streamlit as st
 from analysis import summarize_etf_changes
 from db import get_holdings, get_saved_dates
 from industry import attach_industry
-from ui import CHART_PALETTE, COLORS, plotly_layout, render_etf_status_card, render_section
+from ui import CHART_PALETTE, COLORS, plotly_layout, render_section
 
 
 def _has_any_data(conn, supported_etfs):
@@ -29,43 +29,47 @@ def _collect_all_summaries(conn, supported_etfs):
 
 
 def _render_status_cards(summaries):
-    cols = st.columns(4)
+    """四欄等結構卡片，避免自訂 HTML 在 Cloud 上塌掉。"""
+    cols = st.columns(4, gap="medium")
     for col, (code, info) in zip(cols, summaries.items()):
         summary = info["summary"]
         with col:
-            if summary is None:
-                render_etf_status_card(code, info["name"], empty=True)
-                continue
-            if summary["prev_date"]:
-                top_buy = None
-                top_sell = None
-                if summary["top_buy"]:
-                    top_buy = (
-                        f"{summary['top_buy']['name']} "
-                        f"+{summary['top_buy']['lots']:.0f}張"
-                    )
-                if summary["top_sell"]:
-                    top_sell = (
-                        f"{summary['top_sell']['name']} "
-                        f"{summary['top_sell']['lots']:.0f}張"
-                    )
-                render_etf_status_card(
-                    code,
-                    info["name"],
-                    latest_date=summary["latest_date"],
-                    change_count=summary["change_count"],
-                    add_count=summary["add_count"],
-                    reduce_count=summary["reduce_count"],
-                    top_buy=top_buy,
-                    top_sell=top_sell,
-                )
-            else:
-                render_etf_status_card(
-                    code,
-                    info["name"],
-                    latest_date=summary["latest_date"],
-                    holding_count=summary["holding_count"],
-                )
+            with st.container(border=True):
+                st.markdown(f"**{code}**")
+                st.caption(info["name"])
+
+                if summary is None:
+                    st.error("尚無資料")
+                    st.caption(" ")
+                    st.caption(" ")
+                    continue
+
+                st.caption(f"最新 {summary['latest_date']}")
+
+                if summary["prev_date"]:
+                    st.metric("今日異動", f"{summary['change_count']} 檔")
+                    a, b = st.columns(2)
+                    a.metric("加碼", summary["add_count"])
+                    b.metric("減碼", summary["reduce_count"])
+                    if summary["top_buy"]:
+                        st.caption(
+                            f"最大加碼 {summary['top_buy']['name']} "
+                            f"+{summary['top_buy']['lots']:.0f} 張"
+                        )
+                    else:
+                        st.caption("最大加碼 —")
+                    if summary["top_sell"]:
+                        st.caption(
+                            f"最大減碼 {summary['top_sell']['name']} "
+                            f"{summary['top_sell']['lots']:.0f} 張"
+                        )
+                    else:
+                        st.caption("最大減碼 —")
+                else:
+                    st.metric("持股檔數", summary["holding_count"])
+                    st.caption("僅單日資料，尚無異動可比對")
+                    st.caption(" ")
+                    st.caption(" ")
 
 
 def _render_cross_etf_table(summaries):
