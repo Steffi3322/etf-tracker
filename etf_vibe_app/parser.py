@@ -298,14 +298,26 @@ def normalize_stock_code(code: str | None) -> str:
 
 def normalize_stock_name(name: str | None) -> str:
     """整理名稱空白；保留投信原檔註記（如 國巨*）。"""
-    text = str(name or "").strip()
+    # pandas/numpy 缺值在布林判斷上是 truthy，不可用 `name or ""`
+    try:
+        if name is None or pd.isna(name):
+            return ""
+    except (TypeError, ValueError):
+        pass
+    text = str(name).strip()
+    if text.lower() in {"", "nan", "none", "null", "<na>"}:
+        return ""
     text = re.sub(r"\s+", "", text)
     return text
 
 
 def pick_display_name(names) -> str:
     """同代號多個名稱時，優先顯示帶 * 註記的最新名稱。"""
-    cleaned = [normalize_stock_name(n) for n in names if str(n or "").strip()]
+    cleaned = []
+    for n in names or []:
+        text = normalize_stock_name(n)
+        if text:
+            cleaned.append(text)
     if not cleaned:
         return ""
     starred = [n for n in cleaned if ("*" in n) or ("＊" in n) or ("※" in n)]

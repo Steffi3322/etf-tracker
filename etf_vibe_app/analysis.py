@@ -85,9 +85,14 @@ def compute_period_diff(df_start, df_end):
             df_period.get("stock_name_y", pd.Series(dtype=object)),
         )
     ]
-    df_period["股票名稱"] = df_period["股票名稱"].replace("", pd.NA)
+    # 缺名稱時回退代號；避免 float NaN 被 astype(str) 變成字面 "nan"
+    df_period["股票名稱"] = df_period["股票名稱"].replace(
+        {"": pd.NA, "nan": pd.NA, "None": pd.NA, "NaN": pd.NA}
+    )
     df_period["股票名稱"] = (
-        df_period["股票名稱"].fillna(df_period["stock_code"]).astype(str)
+        df_period["股票名稱"]
+        .fillna(df_period["stock_code"])
+        .map(lambda x: str(x) if pd.notna(x) else "")
     )
     for col in ("w_start", "w_end", "s_start", "s_end"):
         if col in df_period.columns:
@@ -139,11 +144,12 @@ def summarize_etf_changes(conn, etf_code, valid_dates, get_holdings_fn):
     top_sell = None
     if not changes.empty:
         top_buy_row = changes.sort_values("區間淨增減(張)", ascending=False).iloc[0]
-        top_buy = {
-            "name": _safe_stock_label(top_buy_row),
-            "code": top_buy_row["stock_code"],
-            "lots": top_buy_row["區間淨增減(張)"],
-        }
+        if top_buy_row["區間淨增減(張)"] > 0:
+            top_buy = {
+                "name": _safe_stock_label(top_buy_row),
+                "code": top_buy_row["stock_code"],
+                "lots": top_buy_row["區間淨增減(張)"],
+            }
         top_sell_row = changes.sort_values("區間淨增減(張)", ascending=True).iloc[0]
         if top_sell_row["區間淨增減(張)"] < 0:
             top_sell = {
