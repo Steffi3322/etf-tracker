@@ -297,12 +297,20 @@ def normalize_stock_code(code: str | None) -> str:
 
 
 def normalize_stock_name(name: str | None) -> str:
-    """去掉投信註記用的 *／＊ 與多餘空白，避免同代號被拆成兩列。"""
+    """整理名稱空白；保留投信原檔註記（如 國巨*）。"""
     text = str(name or "").strip()
-    # 常見註記：國巨*、台積電＊
-    text = text.replace("＊", "").replace("*", "").replace("※", "")
     text = re.sub(r"\s+", "", text)
     return text
+
+
+def pick_display_name(names) -> str:
+    """同代號多個名稱時，優先顯示帶 * 註記的最新名稱。"""
+    cleaned = [normalize_stock_name(n) for n in names if str(n or "").strip()]
+    if not cleaned:
+        return ""
+    starred = [n for n in cleaned if ("*" in n) or ("＊" in n) or ("※" in n)]
+    pool = starred or cleaned
+    return pool[-1]
 
 
 def _normalize_holding_row(code, name, weight, shares) -> tuple:

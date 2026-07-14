@@ -75,12 +75,18 @@ def style_action_column(df: pd.DataFrame, col: str = "動向"):
 
 
 def compute_period_diff(df_start, df_end):
+    from parser import pick_display_name
+
     df_period = pd.merge(df_end, df_start, on="stock_code", how="outer")
-    df_period["股票名稱"] = (
-        df_period["stock_name_x"]
-        .fillna(df_period["stock_name_y"])
-        .fillna(df_period["stock_code"])
-    )
+    df_period["股票名稱"] = [
+        pick_display_name([a, b])
+        for a, b in zip(
+            df_period.get("stock_name_x", pd.Series(dtype=object)),
+            df_period.get("stock_name_y", pd.Series(dtype=object)),
+        )
+    ]
+    df_period["股票名稱"] = df_period["股票名稱"].replace("", pd.NA)
+    df_period["股票名稱"] = df_period["股票名稱"].fillna(df_period["stock_code"])
     df_period = df_period.fillna(0)
     df_period["區間淨增減(張)"] = ((df_period["s_end"] - df_period["s_start"]) / 1000).round(1)
     return df_period

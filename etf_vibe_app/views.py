@@ -182,17 +182,16 @@ def render_detail_analysis(conn):
             st.info("💡 目前尚無歷史數據。")
         else:
             df_matrix_raw = get_holdings_for_dates(conn, view_etf_code, recent_dates)
-            # 同代號跨日名稱可能有「國巨 / 國巨*」差異，一律以代號合併
-            from parser import normalize_stock_name
+            # 同代號只顯示一列；名稱以原檔為準（含 * 註記），不因跨日字串差異拆列
+            from parser import pick_display_name
 
             df_matrix_raw = df_matrix_raw.copy()
-            df_matrix_raw["stock_name"] = df_matrix_raw["stock_name"].map(normalize_stock_name)
             df_matrix_raw["張數_float"] = df_matrix_raw["shares"] / 1000
 
             name_map = (
                 df_matrix_raw.sort_values("date")
                 .groupby("stock_code", as_index=True)["stock_name"]
-                .agg(lambda s: next((x for x in reversed(list(s)) if x), ""))
+                .agg(lambda s: pick_display_name(list(s)))
             )
 
             df_pivot = (
@@ -224,7 +223,12 @@ def render_detail_analysis(conn):
             ].rename(columns={"stock_code": "股票代號", "stock_name": "股票名稱"})
             df_matrix_final.index = range(1, len(df_matrix_final) + 1)
 
-            st.caption("同一股票代號會合併顯示（自動忽略名稱註記如 *）。")
+            # 防呆：同一代號不該出現兩列
+            dup_codes = df_matrix_final["股票代號"][df_matrix_final["股票代號"].duplicated()]
+            if not dup_codes.empty:
+                st.warning(f"偵測到重複代號（已應合併）：{', '.join(dup_codes.unique())}")
+
+            st.caption("同一股票代號只列一列；名稱保留投信原檔（含 * 註記）。")
             st.dataframe(df_matrix_final, use_container_width=True, height=500)
             csv_matrix = df_matrix_final.to_csv(index=False).encode("utf-8-sig")
             st.download_button(

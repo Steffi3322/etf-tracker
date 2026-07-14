@@ -227,7 +227,6 @@ def init_db():
     conn.execute(_CREATE_TABLE_SQL)
     conn.commit()
     conn.close()
-    normalize_existing_stock_names()
 
 
 def save_to_db(date_str, etf_code, holdings_list):
@@ -252,27 +251,6 @@ def save_to_db(date_str, etf_code, holdings_list):
         )
     conn.commit()
     conn.close()
-
-
-def normalize_existing_stock_names() -> int:
-    """修正庫內名稱註記（如 國巨* → 國巨），避免同代號被拆列。"""
-    conn = get_connection()
-    try:
-        # 用 SQL 批次清掉常見註記，避免逐列 HTTP 更新過慢
-        before = conn.execute(
-            "SELECT COUNT(*) FROM etf_holdings "
-            "WHERE stock_name LIKE '%*%' OR stock_name LIKE '%＊%' OR stock_name LIKE '%※%'"
-        ).fetchone()
-        before_n = int(before[0]) if before else 0
-        conn.execute("UPDATE etf_holdings SET stock_name = REPLACE(stock_name, '*', '')")
-        conn.execute("UPDATE etf_holdings SET stock_name = REPLACE(stock_name, '＊', '')")
-        conn.execute("UPDATE etf_holdings SET stock_name = REPLACE(stock_name, '※', '')")
-        conn.commit()
-    except Exception:
-        conn.close()
-        return 0
-    conn.close()
-    return before_n
 
 
 def clear_all_data():
