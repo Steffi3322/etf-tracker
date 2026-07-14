@@ -16,7 +16,8 @@ st.set_page_config(
 inject_styles()
 init_db()
 
-# 總覽卡片以 ?etf= / ?chg= 連到單檔分析（須在導覽 widget 建立前處理）
+# 深連結 ?etf= / ?chg= 仍可用（須在導覽 widget 建立前處理）
+# 總覽卡片改走 session 跳轉，不再寫入 query，避免上一頁要按兩次
 etf_param = st.query_params.get("etf")
 chg_param = st.query_params.get("chg")
 if etf_param:

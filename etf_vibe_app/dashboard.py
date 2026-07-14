@@ -43,14 +43,20 @@ def _escape_html(text: str) -> str:
     )
 
 
+def _nav_to_etf(code: str, name: str) -> None:
+    st.session_state["view_etf_select"] = f"{code} {name}"
+    st.session_state["main_nav"] = "單檔分析"
+    st.session_state["period_chg_filter"] = "全部"
+
+
 def _render_status_cards(summaries):
-    """整張卡片可點，進入該檔變動明細（不分加碼／減碼）。"""
+    """白卡片視覺 + session 跳轉（不走 ?etf=，避免瀏覽器上一頁要按兩次）。"""
     cols = st.columns(4, gap="medium")
     for col, (code, info) in zip(cols, summaries.items()):
         summary = info["summary"]
         with col:
             if summary is None:
-                with st.container(border=True):
+                with st.container(border=True, key=f"etf_card_{code}"):
                     st.markdown(f"**{code}**")
                     st.caption(info["name"])
                     st.error("尚無資料")
@@ -88,20 +94,25 @@ def _render_status_cards(summaries):
                     f'<div class="etf-card-note">僅單日資料，尚無異動可比對</div>'
                 )
 
-            # st.html 不走 Markdown，整卡 <a> 可點且不會變成程式碼區塊
             card_html = (
-                f'<a class="etf-card-link" href="?etf={code}" target="_self">'
                 f'<div class="etf-card">'
                 f'<div class="etf-card-code">{code}</div>'
                 f'<div class="etf-card-name">{_escape_html(info["name"])}</div>'
                 f"{body}"
-                f'<div class="etf-card-hint">點擊查看異動明細</div>'
-                f"</div></a>"
+                f"</div>"
             )
-            if hasattr(st, "html"):
-                st.html(card_html)
-            else:
-                st.markdown(card_html, unsafe_allow_html=True)
+            with st.container(border=False, key=f"etf_card_{code}"):
+                if hasattr(st, "html"):
+                    st.html(card_html)
+                else:
+                    st.markdown(card_html, unsafe_allow_html=True)
+                st.button(
+                    "點擊查看異動明細",
+                    key=f"go_{code}",
+                    use_container_width=True,
+                    on_click=_nav_to_etf,
+                    args=(code, info["name"]),
+                )
 
 
 def _render_cross_etf_table(summaries):
