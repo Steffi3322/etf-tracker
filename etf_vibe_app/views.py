@@ -222,7 +222,7 @@ def render_detail_analysis(conn):
 
                 _render_csv_pdf_downloads(
                     show,
-                    file_stem=f"{view_etf_code}_period_report_{actual_start_str}_{actual_end_str}",
+                    file_stem=f"{view_etf_code}_{actual_end_str}",
                     csv_label=f"📥 匯出 CSV（{actual_start_str}～{actual_end_str}）",
                     pdf_title=f"{view_etf_code} 區間操盤報告",
                     pdf_subtitle=f"{selected_view_etf_str}　|　{actual_start_str} → {actual_end_str}",
@@ -299,7 +299,7 @@ def render_detail_analysis(conn):
             date_span = f"{recent_dates[0]}～{recent_dates[-1]}"
             _render_csv_pdf_downloads(
                 csv_export,
-                file_stem=f"{view_etf_code}_weekly_matrix_{recent_dates[0]}_{recent_dates[-1]}",
+                file_stem=f"{view_etf_code}_{recent_dates[-1]}",
                 csv_label="📥 匯出 CSV（一週矩陣）",
                 pdf_title=f"{view_etf_code} 一週操盤大查表",
                 pdf_subtitle=f"{selected_view_etf_str}　|　{date_span}",
@@ -341,7 +341,7 @@ def render_detail_analysis(conn):
 
         _render_csv_pdf_downloads(
             df_raw_tab3,
-            file_stem=f"{view_etf_code}_holdings_{actual_inv_str}",
+            file_stem=f"{view_etf_code}_{actual_inv_str}",
             csv_label="📥 匯出 CSV（當日持股）",
             pdf_title=f"{view_etf_code} 持股明細庫存",
             pdf_subtitle=f"{selected_view_etf_str}　|　{actual_inv_str}",
