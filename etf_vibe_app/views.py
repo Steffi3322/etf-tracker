@@ -14,6 +14,7 @@ from analysis import (
     is_cut_action,
     label_action,
     style_action_column,
+    style_matrix_day_changes,
 )
 from db import (
     SUPPORTED_ETFS,
@@ -228,9 +229,6 @@ def render_detail_analysis(conn):
                 columns=["sort_key"]
             )
 
-            for col in time_cols:
-                df_matrix_sorted[col] = df_matrix_sorted[col].apply(lambda x: "{:,.0f}".format(x))
-
             df_matrix_final = df_matrix_sorted[
                 ["stock_code", "stock_name", *time_cols]
             ].rename(columns={"stock_code": "股票代號", "stock_name": "股票名稱"})
@@ -241,9 +239,19 @@ def render_detail_analysis(conn):
             if not dup_codes.empty:
                 st.warning(f"偵測到重複代號（已應合併）：{', '.join(dup_codes.unique())}")
 
-            st.caption("同一股票代號只列一列；名稱保留投信原檔（含 * 註記）。")
-            st.dataframe(df_matrix_final, use_container_width=True, height=500)
-            csv_matrix = df_matrix_final.to_csv(index=False).encode("utf-8-sig")
+            st.caption(
+                "同一股票代號只列一列；名稱保留投信原檔（含 * 註記）。"
+                "相對前一日：綠色＝加碼、橘色＝減碼。"
+            )
+            st.dataframe(
+                style_matrix_day_changes(df_matrix_final, time_cols),
+                use_container_width=True,
+                height=500,
+            )
+            csv_export = df_matrix_final.copy()
+            for col in time_cols:
+                csv_export[col] = csv_export[col].map(lambda x: f"{x:,.0f}")
+            csv_matrix = csv_export.to_csv(index=False).encode("utf-8-sig")
             st.download_button(
                 "📥 匯出此核心操盤總覽大表為 CSV",
                 csv_matrix,

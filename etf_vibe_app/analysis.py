@@ -74,6 +74,33 @@ def style_action_column(df: pd.DataFrame, col: str = "動向"):
     return df.style.map(_color, subset=[col])
 
 
+def style_matrix_day_changes(df: pd.DataFrame, time_cols: list[str]):
+    """移動矩陣：相對前一日加碼＝綠、減碼＝橘；數字千分位整數顯示。"""
+    if df.empty or len(time_cols) < 2:
+        return df
+
+    add_style = "background-color: #e7f5ee; color: #1f6b4f; font-weight: 700"
+    cut_style = "background-color: #fbebe3; color: #a85a2a; font-weight: 700"
+
+    def _paint(data: pd.DataFrame) -> pd.DataFrame:
+        styles = pd.DataFrame("", index=data.index, columns=data.columns)
+        for i, col in enumerate(time_cols):
+            if i == 0 or col not in data.columns:
+                continue
+            prev = time_cols[i - 1]
+            if prev not in data.columns:
+                continue
+            cur = pd.to_numeric(data[col], errors="coerce").fillna(0)
+            before = pd.to_numeric(data[prev], errors="coerce").fillna(0)
+            styles.loc[cur > before, col] = add_style
+            styles.loc[cur < before, col] = cut_style
+        return styles
+
+    styler = df.style.apply(_paint, axis=None)
+    styler = styler.format({c: "{:,.0f}" for c in time_cols if c in df.columns})
+    return styler
+
+
 def compute_period_diff(df_start, df_end):
     from parser import pick_display_name
 
