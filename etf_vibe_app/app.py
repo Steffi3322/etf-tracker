@@ -3,7 +3,7 @@
 import streamlit as st
 
 from dashboard import render_dashboard
-from db import SUPPORTED_ETFS, get_connection, init_db, using_turso
+from db import SUPPORTED_ETFS, ensure_db, get_connection, using_turso
 from ui import inject_styles, render_hero
 from views import render_detail_analysis
 
@@ -14,7 +14,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 inject_styles()
-init_db()
+ensure_db()
 
 # 深連結 ?etf= / ?chg= 仍可用（須在導覽 widget 建立前處理）
 # 總覽卡片改走 session 跳轉，不再寫入 query，避免上一頁要按兩次

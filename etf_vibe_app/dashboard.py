@@ -9,28 +9,38 @@ from analysis import (
     summarize_etf_changes,
     style_action_column,
 )
-from db import get_holdings, get_saved_dates
+from db import cached_holdings, cached_saved_dates
 from industry import attach_industry
 from ui import CHART_PALETTE, COLORS, plotly_layout, render_section
 
 
-def _has_any_data(conn, supported_etfs):
-    for code in supported_etfs:
-        if get_saved_dates(conn, code):
-            return True
-    return False
+def _cached_holdings_fn(_conn, date_str, etf_code):
+    return cached_holdings(date_str, etf_code)
 
 
-def _collect_all_summaries(conn, supported_etfs):
+@st.cache_data(ttl=300, show_spinner=False)
+def cached_dashboard_summaries(etf_items: tuple) -> dict:
+    """快取四檔總覽摘要，避免每次點擊重打 Turso。"""
     summaries = {}
-    for code, name in supported_etfs.items():
-        dates = get_saved_dates(conn, code)
+    for code, name in etf_items:
+        dates = cached_saved_dates(code)
         summaries[code] = {
             "name": name,
             "dates": dates,
-            "summary": summarize_etf_changes(conn, code, dates, get_holdings),
+            "summary": summarize_etf_changes(None, code, dates, _cached_holdings_fn),
         }
     return summaries
+
+
+def _summary_holdings(summary: dict) -> pd.DataFrame:
+    """取出摘要內已載入的持股，欄位對齊 weight/shares。"""
+    holdings = summary.get("holdings")
+    if holdings is None or holdings.empty:
+        return pd.DataFrame()
+    out = holdings.copy()
+    if "weight" not in out.columns and "w_end" in out.columns:
+        out = out.rename(columns={"w_end": "weight", "s_end": "shares"})
+    return out
 
 
 def _escape_html(text: str) -> str:
@@ -208,7 +218,8 @@ def _render_change_bar_chart(summaries):
     st.plotly_chart(fig, use_container_width=True)
 
 
-def _render_treemap(conn, summaries, supported_etfs):
+@st.fragment
+def _render_treemap(summaries):
     options = {
         f"{code} {info['name']}": code
         for code, info in summaries.items()
@@ -220,7 +231,9 @@ def _render_treemap(conn, summaries, supported_etfs):
     selected = st.selectbox("選擇 ETF 檢視持股權重", list(options.keys()), key="dash_treemap_etf")
     code = options[selected]
     summary = summaries[code]["summary"]
-    holdings = get_holdings(conn, summary["latest_date"], code)
+    holdings = _summary_holdings(summary)
+    if holdings.empty:
+        holdings = cached_holdings(summary["latest_date"], code)
     if holdings.empty:
         return
 
@@ -238,7 +251,8 @@ def _render_treemap(conn, summaries, supported_etfs):
     st.plotly_chart(fig, use_container_width=True)
 
 
-def _render_industry_donut(conn, summaries, supported_etfs):
+@st.fragment
+def _render_industry_donut(summaries):
     """最新交易日產業權重甜甜圈圖（右側圖例顯示百分比）。"""
     options = {
         f"{code} {info['name']}": code
@@ -252,8 +266,11 @@ def _render_industry_donut(conn, summaries, supported_etfs):
         "選擇 ETF 檢視產業配置", list(options.keys()), key="dash_industry_etf"
     )
     code = options[selected]
-    latest = summaries[code]["summary"]["latest_date"]
-    holdings = get_holdings(conn, latest, code)
+    summary = summaries[code]["summary"]
+    latest = summary["latest_date"]
+    holdings = _summary_holdings(summary)
+    if holdings.empty:
+        holdings = cached_holdings(latest, code)
     if holdings.empty:
         return
 
@@ -333,11 +350,12 @@ def render_dashboard(conn, supported_etfs):
         "點擊任一張卡片，查看該檔全部異動明細。",
     )
 
-    if not _has_any_data(conn, supported_etfs):
+    etf_items = tuple(supported_etfs.items())
+    summaries = cached_dashboard_summaries(etf_items)
+    if not any(info["summary"] is not None for info in summaries.values()):
         st.info("尚無任何 ETF 資料。請由管理員上傳持股明細。")
         return
 
-    summaries = _collect_all_summaries(conn, supported_etfs)
     _render_status_cards(summaries)
 
     render_section("最新異動明細", "四檔合併檢視。")
@@ -349,7 +367,7 @@ def render_dashboard(conn, supported_etfs):
         _render_change_bar_chart(summaries)
     with chart_col2:
         render_section("持股權重結構")
-        _render_treemap(conn, summaries, supported_etfs)
+        _render_treemap(summaries)
 
     render_section("產業分析", "最新交易日產業配置占比。")
-    _render_industry_donut(conn, summaries, supported_etfs)
+    _render_industry_donut(summaries)

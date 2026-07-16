@@ -10,12 +10,12 @@ import streamlit as st
 from auth import require_admin
 from db import (
     SUPPORTED_ETFS,
+    cached_list_snapshots,
     clear_all_data,
     delete_snapshot,
-    get_coverage_matrix,
+    ensure_db,
     get_connection,
-    init_db,
-    list_snapshots,
+    get_coverage_matrix,
     save_to_db,
     using_turso,
 )
@@ -32,7 +32,7 @@ from ui import inject_styles, render_hero, render_section
 
 st.set_page_config(page_title="ETF 追蹤 · 管理後台", layout="wide", page_icon="🗂️")
 inject_styles()
-init_db()
+ensure_db()
 
 if not require_admin():
     st.stop()
@@ -294,8 +294,8 @@ with tab_upload:
 with tab_data:
     render_section("資料管理", "查看已歸檔日期；錯傳可刪除單日後重傳。")
 
+    snapshots = cached_list_snapshots()
     conn = get_connection()
-    snapshots = list_snapshots(conn)
     coverage = get_coverage_matrix(conn, SUPPORTED_ETFS, recent_n=15)
     conn.close()
 

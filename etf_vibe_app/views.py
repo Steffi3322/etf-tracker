@@ -15,7 +15,12 @@ from analysis import (
     label_action,
     style_action_column,
 )
-from db import SUPPORTED_ETFS, get_holdings, get_holdings_for_dates, get_saved_dates
+from db import (
+    SUPPORTED_ETFS,
+    cached_holdings,
+    cached_holdings_for_dates,
+    cached_saved_dates,
+)
 from ui import render_section
 
 
@@ -33,7 +38,7 @@ def render_detail_analysis(conn):
         "選擇主動式 ETF", etf_options, key="view_etf_select"
     )
     view_etf_code = selected_view_etf_str.split(" ")[0]
-    valid_dates_list = get_saved_dates(conn, view_etf_code)
+    valid_dates_list = cached_saved_dates(view_etf_code)
 
     if not valid_dates_list:
         st.info(
@@ -42,15 +47,21 @@ def render_detail_analysis(conn):
         )
         return
 
-    tab1, tab2, tab3 = st.tabs(
-        [
+    # 用 segmented_control 取代 tabs：只算目前分頁，避免一次算三份
+    detail_tab = st.segmented_control(
+        "分析分頁",
+        options=[
             "⏳ 區間波段操盤總結",
-            "📊 一週操盤大查表 (移動矩陣)",
-            "📄 原始持股明細庫存",
-        ]
+            "📊 一週操盤大查表",
+            "📄 原始持股明細",
+        ],
+        key="detail_main_tab",
+        label_visibility="collapsed",
     )
+    if detail_tab is None:
+        detail_tab = "⏳ 區間波段操盤總結"
 
-    with tab1:
+    if detail_tab == "⏳ 區間波段操盤總結":
         st.write("### ⏳ 自訂任意時間段：波段調倉大統整")
         st.caption("預設自動鎖定最新兩個交易日，日曆具備開盤日自動對齊。")
 
@@ -86,10 +97,10 @@ def render_detail_analysis(conn):
         else:
             st.info(f"📊 分析區間：`{actual_start_str}` → `{actual_end_str}`")
 
-            df_start = get_holdings(conn, actual_start_str, view_etf_code).rename(
+            df_start = cached_holdings(actual_start_str, view_etf_code).rename(
                 columns={"weight": "w_start", "shares": "s_start"}
             )
-            df_end = get_holdings(conn, actual_end_str, view_etf_code).rename(
+            df_end = cached_holdings(actual_end_str, view_etf_code).rename(
                 columns={"weight": "w_end", "shares": "s_end"}
             )
             df_period = compute_period_diff(df_start, df_end)
@@ -173,7 +184,7 @@ def render_detail_analysis(conn):
                     "text/csv",
                 )
 
-    with tab2:
+    elif detail_tab == "📊 一週操盤大查表":
         st.write("### 📅 一週操盤大查表 (歷史持股張數移動矩陣)")
         st.caption("移動矩陣數字統一為整數張數（千分位、零位小數）。")
         recent_dates = valid_dates_list[-7:]
@@ -181,7 +192,9 @@ def render_detail_analysis(conn):
         if not recent_dates:
             st.info("💡 目前尚無歷史數據。")
         else:
-            df_matrix_raw = get_holdings_for_dates(conn, view_etf_code, recent_dates)
+            df_matrix_raw = cached_holdings_for_dates(
+                view_etf_code, tuple(recent_dates)
+            )
             # 同代號只顯示一列；名稱以原檔為準（含 * 註記），不因跨日字串差異拆列
             from parser import pick_display_name
 
@@ -238,7 +251,7 @@ def render_detail_analysis(conn):
                 "text/csv",
             )
 
-    with tab3:
+    elif detail_tab == "📄 原始持股明細":
         st.write("### 📄 完整真實持股明細庫存")
         st.caption("日曆具備開盤交易日自動校正對齊。")
 
@@ -254,7 +267,7 @@ def render_detail_analysis(conn):
 
         st.write(f"#### 📅 {actual_inv_str} 當日完整持股庫存清單")
 
-        df_raw_tab3 = get_holdings(conn, actual_inv_str, view_etf_code)
+        df_raw_tab3 = cached_holdings(actual_inv_str, view_etf_code)
         df_raw_tab3 = df_raw_tab3.rename(
             columns={
                 "stock_code": "股票代號",

@@ -7,6 +7,7 @@ import urllib.request
 from pathlib import Path
 
 import pandas as pd
+import streamlit as st
 
 SUPPORTED_ETFS = {
     "00400A": "國泰動能高息主動",
@@ -229,6 +230,59 @@ def init_db():
     conn.close()
 
 
+@st.cache_resource(show_spinner=False)
+def ensure_db() -> bool:
+    """每個 process 只建表一次，避免每次點擊都打 Turso。"""
+    init_db()
+    return True
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def cached_saved_dates(etf_code: str) -> list:
+    conn = get_connection()
+    try:
+        return get_saved_dates(conn, etf_code)
+    finally:
+        conn.close()
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def cached_holdings(date_str: str, etf_code: str) -> pd.DataFrame:
+    conn = get_connection()
+    try:
+        return get_holdings(conn, date_str, etf_code)
+    finally:
+        conn.close()
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def cached_holdings_for_dates(etf_code: str, dates: tuple) -> pd.DataFrame:
+    conn = get_connection()
+    try:
+        return get_holdings_for_dates(conn, etf_code, list(dates))
+    finally:
+        conn.close()
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def cached_list_snapshots() -> pd.DataFrame:
+    return list_snapshots()
+
+
+def clear_data_caches() -> None:
+    """Admin 寫入後清掉讀取快取。"""
+    cached_saved_dates.clear()
+    cached_holdings.clear()
+    cached_holdings_for_dates.clear()
+    cached_list_snapshots.clear()
+    try:
+        from dashboard import cached_dashboard_summaries
+
+        cached_dashboard_summaries.clear()
+    except Exception:
+        pass
+
+
 def save_to_db(date_str, etf_code, holdings_list):
     from parser import normalize_stock_code, normalize_stock_name
 
@@ -251,6 +305,7 @@ def save_to_db(date_str, etf_code, holdings_list):
         )
     conn.commit()
     conn.close()
+    clear_data_caches()
 
 
 def clear_all_data():
@@ -258,6 +313,7 @@ def clear_all_data():
     conn.execute("DELETE FROM etf_holdings")
     conn.commit()
     conn.close()
+    clear_data_caches()
 
 
 def delete_snapshot(etf_code: str, date_str: str) -> int:
@@ -270,6 +326,7 @@ def delete_snapshot(etf_code: str, date_str: str) -> int:
     conn.commit()
     affected = getattr(cur, "rowcount", -1)
     conn.close()
+    clear_data_caches()
     return int(affected) if affected is not None else -1
 
 
@@ -349,15 +406,19 @@ def get_holdings_for_dates(conn, etf_code, dates):
 
 
 def get_coverage_matrix(conn, supported_etfs, recent_n=15):
-    """回傳 ETF × 日期 的有無資料矩陣（1=有、0=無）。"""
-    all_dates = get_all_dates(conn)
-    if not all_dates:
+    """回傳 ETF × 日期 的有無資料矩陣（1=有、0=無）。一次查出避免 N+1。"""
+    pairs = _read_sql(conn, "SELECT DISTINCT etf_code, date FROM etf_holdings")
+    if pairs.empty:
         return pd.DataFrame()
 
+    all_dates = sorted(pairs["date"].unique().tolist())
     dates = all_dates[-recent_n:]
+    by_etf = {
+        code: set(g["date"].tolist()) for code, g in pairs.groupby("etf_code")
+    }
     rows = []
     for code, name in supported_etfs.items():
-        saved = set(get_saved_dates(conn, code))
+        saved = by_etf.get(code, set())
         row = {"ETF": f"{code} {name}"}
         for d in dates:
             row[d] = 1 if d in saved else 0
