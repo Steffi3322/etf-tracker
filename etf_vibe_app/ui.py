@@ -14,8 +14,11 @@ COLORS = {
     "sand": "#f7f4ee",
     "paper": "#faf9f6",
     "line": "#e2e7e3",
-    "buy": "#5aaa8a",
-    "sell": "#d0895c",
+    # 台股習慣：紅漲（加碼）、綠跌（減碼）
+    "buy": "#c45b52",
+    "buy_bg": "#fceceb",
+    "sell": "#2f735c",
+    "sell_bg": "#e7f5ee",
     "muted": "#6b7a88",
     "danger": "#c45b52",
 }
@@ -185,11 +188,11 @@ div[class*="st-key-etf_card_"][data-testid="stVerticalBlock"]:has(button:active)
   border-radius: 999px;
 }}
 .etf-pill.buy {{
-  background: {COLORS["mint"]};
-  color: {COLORS["jade_deep"]};
+  background: {COLORS["buy_bg"]};
+  color: {COLORS["buy"]};
 }}
 .etf-pill.sell {{
-  background: #f8ebe3;
+  background: {COLORS["sell_bg"]};
   color: {COLORS["sell"]};
 }}
 .etf-card-note {{
@@ -384,11 +387,11 @@ div[data-testid="stTabs"] button[aria-selected="true"] {{
   border-radius: 999px;
 }}
 .vibe-pill-buy {{
-  background: {COLORS["mint"]};
-  color: {COLORS["jade_deep"]};
+  background: {COLORS["buy_bg"]};
+  color: {COLORS["buy"]};
 }}
 .vibe-pill-sell {{
-  background: #f8ebe3;
+  background: {COLORS["sell_bg"]};
   color: {COLORS["sell"]};
 }}
 .vibe-pill-muted {{

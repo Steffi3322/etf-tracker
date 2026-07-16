@@ -64,9 +64,11 @@ def style_action_column(df: pd.DataFrame, col: str = "動向"):
 
     def _color(val: str) -> str:
         if is_add_action(str(val)):
-            return "background-color: #e7f5ee; color: #1f6b4f; font-weight: 700"
+            # 台股習慣：紅＝加碼／新進
+            return "background-color: #fceceb; color: #b53a3a; font-weight: 700"
         if is_cut_action(str(val)):
-            return "background-color: #fbebe3; color: #a85a2a; font-weight: 700"
+            # 綠＝減碼／清倉
+            return "background-color: #e7f5ee; color: #1f6b4f; font-weight: 700"
         return ""
 
     if col not in df.columns or df.empty:
@@ -75,12 +77,12 @@ def style_action_column(df: pd.DataFrame, col: str = "動向"):
 
 
 def style_matrix_day_changes(df: pd.DataFrame, time_cols: list[str]):
-    """移動矩陣：相對前一日加碼＝綠、減碼＝橘；數字千分位整數顯示。"""
+    """移動矩陣：相對前一日加碼＝紅、減碼＝綠；數字千分位整數顯示。"""
     if df.empty or len(time_cols) < 2:
         return df
 
-    add_style = "background-color: #e7f5ee; color: #1f6b4f; font-weight: 700"
-    cut_style = "background-color: #fbebe3; color: #a85a2a; font-weight: 700"
+    add_style = "background-color: #fceceb; color: #b53a3a; font-weight: 700"
+    cut_style = "background-color: #e7f5ee; color: #1f6b4f; font-weight: 700"
 
     def _paint(data: pd.DataFrame) -> pd.DataFrame:
         styles = pd.DataFrame("", index=data.index, columns=data.columns)

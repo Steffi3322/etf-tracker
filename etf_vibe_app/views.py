@@ -156,7 +156,7 @@ def render_detail_analysis(conn):
                 show.index = range(1, len(show) + 1)
                 if chosen and chosen != "全部":
                     st.info(f"目前顯示：{chosen}（共 {len(show)} 檔）")
-                st.caption("動向欄有顏色標示：綠色系＝加碼／新進，橘色系＝減碼／清倉。")
+                st.caption("動向欄有顏色標示：紅色系＝加碼／新進，綠色系＝減碼／清倉。")
                 st.dataframe(
                     style_action_column(show, "動向"),
                     use_container_width=True,
@@ -241,7 +241,7 @@ def render_detail_analysis(conn):
 
             st.caption(
                 "同一股票代號只列一列；名稱保留投信原檔（含 * 註記）。"
-                "相對前一日：綠色＝加碼、橘色＝減碼。"
+                "相對前一日：紅色＝加碼、綠色＝減碼。"
             )
             st.dataframe(
                 style_matrix_day_changes(df_matrix_final, time_cols),
