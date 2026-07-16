@@ -27,7 +27,7 @@ from ui import render_section
 
 
 def _render_csv_pdf_downloads(
-    df: pd.DataFrame,
+    csv_df: pd.DataFrame,
     *,
     file_stem: str,
     csv_label: str,
@@ -35,14 +35,17 @@ def _render_csv_pdf_downloads(
     pdf_subtitle: str = "",
     landscape: bool = False,
     key_prefix: str,
+    pdf_df: pd.DataFrame | None = None,
+    highlight_time_cols: list[str] | None = None,
 ) -> None:
-    """CSV + PDF 並排下載。"""
-    csv_bytes = df.to_csv(index=False).encode("utf-8-sig")
+    """CSV + PDF 並排下載。pdf_df 可傳數值版矩陣以套用加碼／減碼色。"""
+    csv_bytes = csv_df.to_csv(index=False).encode("utf-8-sig")
     pdf_bytes = dataframe_to_pdf(
-        df,
+        pdf_df if pdf_df is not None else csv_df,
         title=pdf_title,
         subtitle=pdf_subtitle,
         landscape_mode=landscape,
+        highlight_time_cols=highlight_time_cols,
     )
     c1, c2 = st.columns(2)
     with c1:
@@ -302,6 +305,8 @@ def render_detail_analysis(conn):
                 pdf_subtitle=f"{selected_view_etf_str}　|　{date_span}",
                 landscape=True,
                 key_prefix=f"matrix_{view_etf_code}",
+                pdf_df=df_matrix_final,
+                highlight_time_cols=time_cols,
             )
 
     elif detail_tab == "📄 原始持股明細":
