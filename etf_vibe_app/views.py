@@ -22,7 +22,47 @@ from db import (
     cached_holdings_for_dates,
     cached_saved_dates,
 )
+from export_pdf import dataframe_to_pdf
 from ui import render_section
+
+
+def _render_csv_pdf_downloads(
+    df: pd.DataFrame,
+    *,
+    file_stem: str,
+    csv_label: str,
+    pdf_title: str,
+    pdf_subtitle: str = "",
+    landscape: bool = False,
+    key_prefix: str,
+) -> None:
+    """CSV + PDF 並排下載。"""
+    csv_bytes = df.to_csv(index=False).encode("utf-8-sig")
+    pdf_bytes = dataframe_to_pdf(
+        df,
+        title=pdf_title,
+        subtitle=pdf_subtitle,
+        landscape_mode=landscape,
+    )
+    c1, c2 = st.columns(2)
+    with c1:
+        st.download_button(
+            csv_label,
+            csv_bytes,
+            f"{file_stem}.csv",
+            "text/csv",
+            key=f"{key_prefix}_csv",
+            use_container_width=True,
+        )
+    with c2:
+        st.download_button(
+            "📄 匯出 PDF",
+            pdf_bytes,
+            f"{file_stem}.pdf",
+            "application/pdf",
+            key=f"{key_prefix}_pdf",
+            use_container_width=True,
+        )
 
 
 def render_detail_analysis(conn):
@@ -177,12 +217,14 @@ def render_detail_analysis(conn):
                     },
                 )
 
-                csv_period = show.to_csv(index=False).encode("utf-8-sig")
-                st.download_button(
-                    f"📥 匯出 {actual_start_str}～{actual_end_str} 精華操作報告",
-                    csv_period,
-                    f"{view_etf_code}_period_report.csv",
-                    "text/csv",
+                _render_csv_pdf_downloads(
+                    show,
+                    file_stem=f"{view_etf_code}_period_report_{actual_start_str}_{actual_end_str}",
+                    csv_label=f"📥 匯出 CSV（{actual_start_str}～{actual_end_str}）",
+                    pdf_title=f"{view_etf_code} 區間操盤報告",
+                    pdf_subtitle=f"{selected_view_etf_str}　|　{actual_start_str} → {actual_end_str}",
+                    landscape=True,
+                    key_prefix=f"period_{view_etf_code}",
                 )
 
     elif detail_tab == "📊 一週操盤大查表":
@@ -251,12 +293,15 @@ def render_detail_analysis(conn):
             csv_export = df_matrix_final.copy()
             for col in time_cols:
                 csv_export[col] = csv_export[col].map(lambda x: f"{x:,.0f}")
-            csv_matrix = csv_export.to_csv(index=False).encode("utf-8-sig")
-            st.download_button(
-                "📥 匯出此核心操盤總覽大表為 CSV",
-                csv_matrix,
-                f"{view_etf_code}_weekly_matrix.csv",
-                "text/csv",
+            date_span = f"{recent_dates[0]}～{recent_dates[-1]}"
+            _render_csv_pdf_downloads(
+                csv_export,
+                file_stem=f"{view_etf_code}_weekly_matrix_{recent_dates[0]}_{recent_dates[-1]}",
+                csv_label="📥 匯出 CSV（一週矩陣）",
+                pdf_title=f"{view_etf_code} 一週操盤大查表",
+                pdf_subtitle=f"{selected_view_etf_str}　|　{date_span}",
+                landscape=True,
+                key_prefix=f"matrix_{view_etf_code}",
             )
 
     elif detail_tab == "📄 原始持股明細":
@@ -289,10 +334,12 @@ def render_detail_analysis(conn):
 
         st.dataframe(df_raw_tab3, use_container_width=True)
 
-        csv_tab3 = df_raw_tab3.to_csv(index=False).encode("utf-8-sig")
-        st.download_button(
-            "📥 下載此日數據為 CSV",
-            csv_tab3,
-            f"{view_etf_code}_holdings_{actual_inv_str}.csv",
-            "text/csv",
+        _render_csv_pdf_downloads(
+            df_raw_tab3,
+            file_stem=f"{view_etf_code}_holdings_{actual_inv_str}",
+            csv_label="📥 匯出 CSV（當日持股）",
+            pdf_title=f"{view_etf_code} 持股明細庫存",
+            pdf_subtitle=f"{selected_view_etf_str}　|　{actual_inv_str}",
+            landscape=False,
+            key_prefix=f"inv_{view_etf_code}_{actual_inv_str}",
         )
